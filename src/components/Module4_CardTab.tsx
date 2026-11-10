@@ -8,7 +8,9 @@ export const Module4_CardTab: React.FC = () => {
     runGenerateImage,
     runGenerateAllImages,
     updateCardPhoto,
+    updateCardGradient,
     removeTextFromCardPhoto,
+    generateCleanPhotoForCard,
   } = useHongsiPhone();
 
   const [isImageAccordionOpen, setIsImageAccordionOpen] = useState(true);
@@ -58,25 +60,79 @@ export const Module4_CardTab: React.FC = () => {
 
             {/* Photo Adjust & Subtitle Crop Controls */}
             {(activeCard?.photo.hasPhoto && (activeCard?.photo.originalUploadUrl || state.sourceInput.referenceImageUrl || activeCard?.photo.url)) && (
-              <div className="p-3 rounded-2xl bg-[#FFF9F5] dark:bg-orange-950/30 border border-orange-200 dark:border-orange-900/60 space-y-2.5">
+              <div className="p-3.5 rounded-2xl bg-[#FFF9F5] dark:bg-orange-950/30 border border-orange-200 dark:border-orange-900/60 space-y-3">
                 <div className="flex items-center justify-between text-xs font-bold text-orange-950 dark:text-orange-200">
-                  <span>사진 글씨 제거 & 비율 조절</span>
+                  <span>사진 글씨 제거 & 선명도 조절</span>
                   <span className="text-[10px] text-orange-600 dark:text-orange-400 font-semibold">
-                    {activeCard?.photo.scale}% 비율 · {activeCard?.photo.offsetY === 0 ? '원형 유지' : `위치 ${activeCard?.photo.offsetY}px`}
+                    {activeCard?.photo.scale}% 비율 · {activeCard?.gradient.enabled ? `어둡기 ${activeCard.gradient.heightPercent}%` : '밝은 원본'}
                   </span>
                 </div>
 
-                {/* AI Text Removal Action */}
-                <button
-                  type="button"
-                  onClick={() => removeTextFromCardPhoto()}
-                  className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-extrabold text-xs shadow-sm flex items-center justify-center space-x-1.5 transition active:scale-[0.98]"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-yellow-300" />
-                  <span>🪄 사진 속 자막/글씨 AI로 지우기</span>
-                </button>
+                {/* 1. AI Text Removal & AI Clean Photo Dual Action */}
+                <div className="space-y-1.5">
+                  <button
+                    type="button"
+                    onClick={() => removeTextFromCardPhoto()}
+                    className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-extrabold text-xs shadow-sm flex items-center justify-center space-x-1.5 transition active:scale-[0.98]"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-yellow-300" />
+                    <span>🪄 사진 속 자막/글씨 AI로 지우기</span>
+                  </button>
 
-                <div className="grid grid-cols-2 gap-2 text-xs font-bold">
+                  <button
+                    type="button"
+                    onClick={() => generateCleanPhotoForCard()}
+                    className="w-full py-2 px-3 rounded-xl bg-white dark:bg-slate-800 border border-purple-300 dark:border-purple-800 hover:bg-purple-50 dark:hover:bg-purple-950/40 text-purple-700 dark:text-purple-300 font-extrabold text-xs shadow-2xs flex items-center justify-center space-x-1.5 transition active:scale-[0.98]"
+                  >
+                    <ImageIcon className="w-3.5 h-3.5 text-purple-600" />
+                    <span>🎨 글씨 없는 초고화질 깨끗한 사진으로 교체</span>
+                  </button>
+                </div>
+
+                {/* 2. Gradient Brightness Switch (화면이 심하게 어두워지는 현상 방지) */}
+                <div className="space-y-1 pt-1 border-t border-orange-100 dark:border-orange-900/40">
+                  <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 flex items-center justify-between">
+                    <span>사진 밝기 & 선명도 (그라데이션 조절)</span>
+                  </label>
+                  <div className="grid grid-cols-3 gap-1.5 text-[11px] font-bold">
+                    <button
+                      type="button"
+                      onClick={() => updateCardGradient({ enabled: true, heightPercent: 28, opacity: 0.55 })}
+                      className={`py-1.5 px-1 rounded-lg border text-center transition ${
+                        activeCard?.gradient.enabled && activeCard?.gradient.heightPercent <= 30
+                          ? 'border-amber-500 bg-amber-50 dark:bg-amber-950/60 text-amber-900 dark:text-amber-200 font-black'
+                          : 'border-slate-200 bg-white dark:bg-slate-800 text-slate-600'
+                      }`}
+                    >
+                      <span>☀️ 밝고 선명하게</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateCardGradient({ enabled: true, heightPercent: 38, opacity: 0.72 })}
+                      className={`py-1.5 px-1 rounded-lg border text-center transition ${
+                        activeCard?.gradient.enabled && activeCard?.gradient.heightPercent > 30 && activeCard?.gradient.heightPercent <= 45
+                          ? 'border-orange-500 bg-orange-100 dark:bg-orange-950/60 text-orange-950 dark:text-orange-200 font-black'
+                          : 'border-slate-200 bg-white dark:bg-slate-800 text-slate-600'
+                      }`}
+                    >
+                      <span>🌤️ 보통 (기본)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateCardGradient({ enabled: false })}
+                      className={`py-1.5 px-1 rounded-lg border text-center transition ${
+                        !activeCard?.gradient.enabled
+                          ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-900 dark:text-emerald-200 font-black'
+                          : 'border-slate-200 bg-white dark:bg-slate-800 text-slate-600'
+                      }`}
+                    >
+                      <span>🚫 어둡기 끔</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* 3. Scale & Position */}
+                <div className="grid grid-cols-2 gap-2 text-xs font-bold pt-1">
                   <button
                     type="button"
                     onClick={() => {
@@ -93,20 +149,20 @@ export const Module4_CardTab: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => {
-                      updateCardPhoto({ scale: 135, offsetY: 20, offsetX: 0 });
+                      updateCardPhoto({ scale: 125, offsetY: 25, offsetX: 0 });
                     }}
                     className={`py-2 px-2 rounded-xl border text-center transition flex items-center justify-center space-x-1 ${
-                      activeCard?.photo.scale >= 130
+                      activeCard?.photo.scale > 100
                         ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-200 shadow-xs'
                         : 'border-slate-200 bg-white dark:bg-slate-800 text-slate-600 hover:bg-slate-50'
                     }`}
                   >
-                    <span>✂️ 하단 글씨 가리기 (확대)</span>
+                    <span>✂️ 하단 자막 가리기 (확대)</span>
                   </button>
                 </div>
 
                 <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
-                  💡 제미나이 웹(gemini.google.com)에서 자막을 지운 사진을 [원문] 탭에서 업로드하시면 100% 원본 비율로 왜곡 없이 바로 적용됩니다.
+                  💡 제미나이 웹(gemini.google.com)에서 자막을 지운 사진을 [원문] 탭에서 업로드하시면 상단 사진이 어두워지지 않고 100% 선명하게 표시됩니다.
                 </p>
               </div>
             )}

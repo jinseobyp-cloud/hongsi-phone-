@@ -282,14 +282,20 @@ export const Module2_CanvasViewport: React.FC = () => {
             />
           ) : null}
 
-          {/* Linear Gradient Overlay */}
+          {/* Linear Gradient Overlay: 상단 피사체는 100% 투명하게 보존하고 하단 텍스트 영역만 부드럽게 암전 */}
           {activeCard?.gradient.enabled && (
             <div
               className="absolute inset-0 pointer-events-none"
               style={{
-                background: `linear-gradient(180deg, transparent 0%, rgba(0,0,0,${
-                  activeCard.gradient.opacity * 0.7
-                }) ${100 - activeCard.gradient.heightPercent}%, #000000 100%)`,
+                background: `linear-gradient(180deg, transparent 0%, transparent ${Math.max(
+                  0,
+                  100 - activeCard.gradient.heightPercent
+                )}%, rgba(0,0,0,${
+                  activeCard.gradient.opacity * 0.45
+                }) ${Math.max(
+                  0,
+                  100 - activeCard.gradient.heightPercent * 0.5
+                )}%, rgba(0,0,0,${activeCard.gradient.opacity}) 100%)`,
               }}
             />
           )}

@@ -20,7 +20,7 @@ import {
   generateBlankCards,
 } from '../services/mockAiService';
 import { exportCardsAsZip } from '../utils/exportZip';
-import { analyzeContentWithAI, generateCardImageAI, formatFallbackTitle, removeTextFromImageWithAI, extractContentFromUrl } from '../services/geminiService';
+import { analyzeContentWithAI, generateCardImageAI, formatFallbackTitle, removeTextFromImageWithAI, extractContentFromUrl, generateCleanSubjectPhotoAI } from '../services/geminiService';
 import {
   fetchServerAuthInfo,
   verifyPasswordMatch,
@@ -76,6 +76,7 @@ interface HongsiPhoneContextType {
   updateCardGradient: (patch: Partial<CardGradient>) => void;
   removeCardPhoto: (index: number) => void;
   removeTextFromCardPhoto: (cardIndex?: number) => Promise<void>;
+  generateCleanPhotoForCard: (cardIndex?: number) => Promise<void>;
   saveProject: () => void;
   toggleCropMode: () => void;
   toggleDarkMode: () => void;
@@ -517,8 +518,8 @@ export const HongsiPhoneProvider: React.FC<{ children: React.ReactNode }> = ({ c
         },
         gradient: {
           enabled: true,
-          heightPercent: idx === 0 && currentRefImage ? 60 : 55,
-          opacity: 0.95,
+          heightPercent: 38,
+          opacity: 0.72,
         },
       }));
 
@@ -717,8 +718,8 @@ export const HongsiPhoneProvider: React.FC<{ children: React.ReactNode }> = ({ c
         },
         gradient: {
           enabled: true,
-          heightPercent: 55,
-          opacity: 0.9,
+          heightPercent: 38,
+          opacity: 0.72,
         },
       };
       return {
@@ -944,6 +945,49 @@ export const HongsiPhoneProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
   };
 
+  const generateCleanPhotoForCard = async (cardIndex?: number) => {
+    const targetIdx = cardIndex !== undefined ? cardIndex : state.activeCardIndex;
+    const activeCard = state.cards[targetIdx];
+    setIsImageGeneratingModalOpen(true);
+    setImageGeneratingStep(0);
+
+    const stepInterval = 650;
+    setTimeout(() => setImageGeneratingStep(1), stepInterval);
+    setTimeout(() => setImageGeneratingStep(2), stepInterval * 2);
+
+    try {
+      const subjectPrompt = activeCard?.titleText || state.projectTitle || 'clean portrait';
+      const cleanImageUrl = await generateCleanSubjectPhotoAI(subjectPrompt);
+
+      setTimeout(() => {
+        setIsImageGeneratingModalOpen(false);
+        setState((prev) => {
+          const updatedCards = [...prev.cards];
+          if (updatedCards[targetIdx]) {
+            updatedCards[targetIdx] = {
+              ...updatedCards[targetIdx],
+              photo: {
+                ...updatedCards[targetIdx].photo,
+                hasPhoto: true,
+                url: cleanImageUrl,
+                scale: 100,
+                offsetY: 0,
+              },
+            };
+          }
+          return {
+            ...prev,
+            cards: updatedCards,
+            isSaved: false,
+          };
+        });
+      }, stepInterval * 3);
+    } catch (e) {
+      setIsImageGeneratingModalOpen(false);
+      console.error('generateCleanPhotoForCard error:', e);
+    }
+  };
+
   const saveProject = () => {
     setState((prev) => ({ ...prev, isSaved: true }));
   };
@@ -1133,6 +1177,7 @@ export const HongsiPhoneProvider: React.FC<{ children: React.ReactNode }> = ({ c
         updateCardGradient,
         removeCardPhoto,
         removeTextFromCardPhoto,
+        generateCleanPhotoForCard,
         saveProject,
         toggleCropMode,
         toggleDarkMode,

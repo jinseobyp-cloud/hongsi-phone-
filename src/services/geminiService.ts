@@ -180,8 +180,8 @@ export async function analyzeContentWithAI(
       },
       gradient: {
         enabled: true,
-        heightPercent: idx === 0 && referenceImageUrl ? 60 : 55,
-        opacity: 0.95,
+        heightPercent: 38,
+        opacity: 0.72,
       },
     }));
 
@@ -345,8 +345,8 @@ ${rawText}
           },
           gradient: {
             enabled: true,
-            heightPercent: idx === 0 && referenceImageUrl ? 60 : 55,
-            opacity: 0.95,
+            heightPercent: 38,
+            opacity: 0.72,
           },
         };
       })
@@ -403,7 +403,7 @@ export async function removeTextFromImageWithAI(
 
   const candidateModels = [
     'gemini-2.0-flash-exp',
-    'gemini-2.5-flash-image',
+    'gemini-2.0-flash-preview-image-generation',
     'gemini-2.0-flash',
   ];
 
@@ -431,7 +431,7 @@ export async function removeTextFromImageWithAI(
               },
             ],
             generationConfig: {
-              responseModalities: ['IMAGE'],
+              responseModalities: ['TEXT', 'IMAGE'],
             },
           }),
         }
@@ -455,6 +455,14 @@ export async function removeTextFromImageWithAI(
   }
 
   throw new Error('AI 글씨 제거를 처리할 수 없습니다. 제미나이 웹에서 생성된 깨끗한 사진을 업로드해 보세요.');
+}
+
+/**
+ * 주제 및 인물 키워드를 바탕으로 글씨/자막이 전혀 없는 초고화질 스튜디오 사진을 생성합니다.
+ */
+export async function generateCleanSubjectPhotoAI(subjectHint: string): Promise<string> {
+  const cleanPrompt = `${subjectHint.replace(/\[|\]|\n/g, ' ')} photographic portrait, flawless glowing skin, clean background, natural studio lighting, highly detailed 8k, textless, no subtitles, no words, no watermark, pristine quality`;
+  return `https://image.pollinations.ai/prompt/${encodeURIComponent(cleanPrompt)}?width=1080&height=1350&nologo=true&seed=${Math.floor(Math.random() * 999999)}`;
 }
 
 export interface ExtractedUrlContent {
