@@ -1,19 +1,27 @@
-const CACHE_NAME = 'hongsiphone-v2-cache-v7';
+const CACHE_NAME = 'hongsiphone-v2-cache-v8';
 const PRECACHE_URLS = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  '/hongsi_icon_v2.png',
-  '/icon.png',
-  '/hongsi_avatar.png',
-  '/hongsi.webp'
+  './',
+  './index.html',
+  './manifest.json',
+  './hongsi_icon_192.png',
+  './hongsi_icon_512.png',
+  './hongsi_maskable_192.png',
+  './hongsi_maskable_512.png',
+  './apple-touch-icon.png',
+  './hongsi_avatar.png'
 ];
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(PRECACHE_URLS);
+      return Promise.all(
+        PRECACHE_URLS.map((url) =>
+          cache.add(url).catch((err) => {
+            console.warn('Precache skip for:', url, err);
+          })
+        )
+      );
     })
   );
 });
@@ -31,12 +39,17 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // Skip caching for Google Gemini API or AI calls
-  if (url.origin.includes('googleapis.com') || url.origin.includes('generativelanguage')) {
+  // Skip caching for Gemini AI, external auth KV (immanuel.co), or non-GET requests
+  if (
+    event.request.method !== 'GET' ||
+    url.origin.includes('googleapis.com') ||
+    url.origin.includes('generativelanguage') ||
+    url.origin.includes('immanuel.co')
+  ) {
     return;
   }
 
-  // Network-First for HTML navigation (always get latest code when online)
+  // Network-First for HTML navigation
   if (event.request.mode === 'navigate' || event.request.destination === 'document') {
     event.respondWith(
       fetch(event.request)
@@ -47,23 +60,23 @@ self.addEventListener('fetch', (event) => {
           }
           return response;
         })
-        .catch(() => caches.match('/index.html'))
+        .catch(() => caches.match('./index.html') || caches.match('./'))
     );
     return;
   }
 
-  // Stale-while-revalidate for static assets
+  // Stale-While-Revalidate for icons and static assets
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
-      const fetchPromise = fetch(event.request).then((networkResponse) => {
-        if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
-          const responseToCache = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache);
-          });
-        }
-        return networkResponse;
-      }).catch(() => null);
+      const fetchPromise = fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const clone = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          }
+          return networkResponse;
+        })
+        .catch(() => cachedResponse);
 
       return cachedResponse || fetchPromise;
     })

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Download, X, Smartphone, CheckCircle, Share, PlusSquare, ExternalLink, AlertTriangle } from 'lucide-react';
+import hongsiAvatar from '../assets/hongsi_avatar.png';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -97,7 +98,7 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({ isOpen, onClos
         <div className="flex flex-col items-center text-center mt-2 mb-4">
           <div className="relative">
             <img
-              src="/hongsi_icon_v2.png?v=2"
+              src={hongsiAvatar}
               alt="홍시폰 앱 아이콘"
               className="w-18 h-18 rounded-2xl shadow-lg ring-4 ring-orange-100 dark:ring-orange-950 mb-3 object-contain"
             />
