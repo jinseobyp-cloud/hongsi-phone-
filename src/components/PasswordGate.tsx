@@ -9,8 +9,9 @@ export const PasswordGate: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!password.trim()) {
       setError(true);
@@ -18,12 +19,17 @@ export const PasswordGate: React.FC = () => {
       return;
     }
 
-    const success = authenticate(password);
-    if (!success) {
-      setError(true);
-      setErrorMessage('비밀번호가 일치하지 않습니다. 다시 확인해주세요.');
-    } else {
-      setError(false);
+    setIsSubmitting(true);
+    try {
+      const success = await authenticate(password);
+      if (!success) {
+        setError(true);
+        setErrorMessage('비밀번호가 일치하지 않습니다. 다시 확인해주세요.');
+      } else {
+        setError(false);
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 

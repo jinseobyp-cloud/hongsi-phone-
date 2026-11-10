@@ -31,7 +31,7 @@ import {
 
 interface HongsiPhoneContextType {
   isAuthenticated: boolean;
-  authenticate: (password: string) => boolean;
+  authenticate: (password: string) => boolean | Promise<boolean>;
   logout: () => void;
   state: ProjectState;
   isLanding: boolean;
@@ -92,7 +92,12 @@ const HongsiPhoneContext = createContext<HongsiPhoneContextType | undefined>(und
 
 export const HongsiPhoneProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-  const [activePassword, setActivePassword] = useState<string>('hongsi2026');
+  const [activePassword, setActivePassword] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('hongsiphone_custom_password') || 'hongsi2026';
+    }
+    return 'hongsi2026';
+  });
 
   // Real-time server auth validation and continuous monitoring
   useEffect(() => {
@@ -150,16 +155,37 @@ export const HongsiPhoneProvider: React.FC<{ children: React.ReactNode }> = ({ c
     };
   }, []);
 
-  const authenticate = (inputPassword: string): boolean => {
-    const isValid = verifyPasswordMatch(inputPassword, activePassword);
-    if (isValid) {
+  const authenticate = async (inputPassword: string): Promise<boolean> => {
+    const cleanInput = (inputPassword || '').trim();
+    if (!cleanInput) return false;
+
+    // 1. 현재 로컬/메모리 및 마스터키 확인
+    if (verifyPasswordMatch(cleanInput, activePassword)) {
       setIsAuthenticated(true);
       if (typeof window !== 'undefined') {
         localStorage.setItem('hongsiphone_auth', 'granted');
-        localStorage.setItem('hongsiphone_session_pass', inputPassword.trim());
+        localStorage.setItem('hongsiphone_session_pass', cleanInput);
       }
       return true;
     }
+
+    // 2. 불일치 시, 방금 관리자가 변경했을 가능성을 대비해 클라우드/서버 최신 비밀번호 즉시 확인
+    try {
+      const info = await fetchServerAuthInfo();
+      const latestPass = info?.activePassword || activePassword;
+      setActivePassword(latestPass);
+      if (verifyPasswordMatch(cleanInput, latestPass)) {
+        setIsAuthenticated(true);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('hongsiphone_auth', 'granted');
+          localStorage.setItem('hongsiphone_session_pass', cleanInput);
+        }
+        return true;
+      }
+    } catch {
+      // ignore
+    }
+
     return false;
   };
 
