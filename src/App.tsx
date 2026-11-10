@@ -12,6 +12,7 @@ import { ColorPickerModal } from './components/ColorPickerModal';
 
 export const AppContent: React.FC = () => {
   const { isAuthenticated, isLanding, state } = useHongsiPhone();
+  const isKakao = typeof navigator !== 'undefined' && /kakaotalk/i.test(navigator.userAgent);
 
   // 1. Password Access Gate (접근 제어 잠금 화면)
   if (!isAuthenticated) {
@@ -27,6 +28,22 @@ export const AppContent: React.FC = () => {
     <div className="min-h-screen bg-slate-100 dark:bg-slate-950 flex justify-center">
       {/* Mobile-first Viewport (max-width: 430px) */}
       <div className="w-full max-w-[430px] min-h-screen bg-white dark:bg-slate-900 shadow-2xl flex flex-col relative pb-8">
+        {/* KakaoTalk In-App Browser Escape Banner */}
+        {isKakao && (
+          <div className="bg-[#FEE500] text-[#191919] px-3.5 py-2 text-xs font-bold flex items-center justify-between border-b border-amber-300 shadow-xs z-50">
+            <span className="truncate pr-2">💡 상하단 검은 바 없이 전체화면으로 실행</span>
+            <button
+              type="button"
+              onClick={() => {
+                window.location.href = `kakaotalk://web/openExternal?url=${encodeURIComponent(window.location.href)}`;
+              }}
+              className="px-2.5 py-1 rounded-lg bg-[#191919] text-white text-[11px] font-black shrink-0 active:scale-95 shadow-xs"
+            >
+              기본 브라우저로 열기
+            </button>
+          </div>
+        )}
+
         {/* Module 1: Sticky Top Header & 3-Tab Bar (원문 | 카드 | 스타일) */}
         <Module1_Header />
 

@@ -708,6 +708,12 @@ export const HongsiPhoneProvider: React.FC<{ children: React.ReactNode }> = ({ c
       } else {
         document.documentElement.classList.remove('dark');
       }
+      if (typeof document !== 'undefined') {
+        const meta = document.getElementById('theme-color-meta') || document.querySelector('meta[name="theme-color"]');
+        if (meta) {
+          meta.setAttribute('content', next ? '#0F172A' : '#FFFFFF');
+        }
+      }
       return next;
     });
   };

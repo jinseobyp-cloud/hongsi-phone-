@@ -2,14 +2,18 @@
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" sizes="192x192" href="./hongsi_icon_192.png?v=4" />
-    <link rel="icon" type="image/png" sizes="512x512" href="./hongsi_icon_512.png?v=4" />
-    <link rel="shortcut icon" href="./hongsi_icon_192.png?v=4" />
-    <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png?v=4" />
-    <link rel="manifest" href="./manifest.json?v=4" />
-    <meta name="theme-color" content="#FFFFFF" />
-    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#FFFFFF" />
-    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0F172A" />
+    <script>
+      // 카카오톡 인앱 브라우저 감지 시 즉시 상하단 검은 바가 없는 스마트폰 기본 브라우저(크롬/삼성인터넷)로 자동 전환
+      if (/kakaotalk/i.test(navigator.userAgent)) {
+        window.location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(window.location.href);
+      }
+    </script>
+    <link rel="icon" type="image/png" sizes="192x192" href="./hongsi_icon_192.png?v=5" />
+    <link rel="icon" type="image/png" sizes="512x512" href="./hongsi_icon_512.png?v=5" />
+    <link rel="shortcut icon" href="./hongsi_icon_192.png?v=5" />
+    <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png?v=5" />
+    <link rel="manifest" href="./manifest.json?v=5" />
+    <meta name="theme-color" content="#FFFFFF" id="theme-color-meta" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />

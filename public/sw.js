@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hongsiphone-v2-cache-v9';
+const CACHE_NAME = 'hongsiphone-v2-cache-v10';
 const PRECACHE_URLS = [
   './',
   './index.html',
