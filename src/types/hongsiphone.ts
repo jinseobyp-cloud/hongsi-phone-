@@ -8,6 +8,7 @@ export type FontWeight = 'normal' | 'bold' | 'extra-bold';
 export interface CardPhoto {
   hasPhoto: boolean;
   url: string;
+  originalUploadUrl?: string;
   promptMode: 'auto' | 'custom';
   styleHint: string;
   scale: number; // 50 ~ 200 (default 100)

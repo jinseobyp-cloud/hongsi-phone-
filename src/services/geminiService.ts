@@ -134,15 +134,19 @@ export async function analyzeContentWithAI(
   const userFallbackTitle = formatFallbackTitle(cleanLines[0] || '스마트폰 카드뉴스', '핵심 비결');
 
   if (!apiKey || !apiKey.trim()) {
-    // Local simulation using user's actual text and uploaded image
+    // Local simulation: Generate clean, text-free AI photo based on topic/reference
+    const topicKeyword = cleanLines[0]?.slice(0, 35) || 'candid photograph';
     let card1Url = '';
     let hasCard1Photo = false;
-    if (referenceImageUrl) {
-      card1Url = referenceImageUrl;
+
+    try {
+      card1Url = await generateCardImageAI(
+        `photorealistic clean photograph of ${topicKeyword}`,
+        'candid portrait textless no words no text no subtitles 8k'
+      );
       hasCard1Photo = true;
-    } else {
-      const topicKeyword = cleanLines[0]?.slice(0, 20) || 'card news background';
-      card1Url = `https://image.pollinations.ai/prompt/${encodeURIComponent(topicKeyword + ' clean photography')}?width=1080&height=1350&nologo=true`;
+    } catch {
+      card1Url = `https://image.pollinations.ai/prompt/${encodeURIComponent(topicKeyword + ' clean photograph textless no words 8k')}?width=1080&height=1350&nologo=true`;
       hasCard1Photo = true;
     }
 
@@ -153,6 +157,7 @@ export async function analyzeContentWithAI(
       photo: {
         hasPhoto: idx === 0 ? hasCard1Photo : false,
         url: idx === 0 ? card1Url : '',
+        originalUploadUrl: (idx === 0 && referenceImageUrl) ? referenceImageUrl : '',
         promptMode: 'auto',
         styleHint: '',
         scale: 100,
@@ -205,7 +210,7 @@ export async function analyzeContentWithAI(
   try {
     const prompt = `
 당신은 인스타그램 카드뉴스 및 바이럴 콘텐츠 전문 AI 에디터입니다.
-다음 원문 기사/글을 바탕으로 카드뉴스를 기획해 주세요.
+다음 원문 기사/글을 바탕으로 카드뉴스를 기획해 주세요. 첨부된 이미지가 있다면 이미지 속 피사체와 분위기를 분석하세요.
 
 [지침]
 ${guideline || '제목에 숫자를 넣어주세요 / 본문은 존댓말로 / 인용문은 있는 그대로 살려주세요'}
@@ -218,15 +223,19 @@ ${rawText}
 2. 가장 바이럴 가능성이 높은 AI 추천 제목 5개:
    - 각 제목은 2줄로 줄바꿈(\\n)을 포함해야 하며, 가장 핵심이 되는 강조 단어/구절은 반드시 [대괄호]로 감싸야 합니다. 예: "220만 유튜버 우주하마\\n[방송 중단하게 만든 질병]"
    - 10점 만점 바이럴 점수(score, 예: "9.5/10")와 선정 이유(reason) 포함
-3. 원문 핵심 요약 3~4문장(articleSummary)
-4. 총 ${targetCardCount}장의 카드 문구(cards):
+3. 1번 표지 배경용 영문 이미지 생성 프롬프트(coverImagePrompt):
+   - 원본 사진에 글씨나 자막, 워터마크가 있더라도, 새로 제작되는 표지 배경 사진에는 글자가 일절 없는 깨끗한 실제 사진(textless clean photograph, no words, no subtitles)이어야 합니다.
+   - 핵심 피사체(인물, 행동, 사물)를 글자 없이 깨끗한 실제 사진으로 그릴 수 있는 30~50단어의 구체적인 영문 프롬프트 작성.
+4. 원문 핵심 요약 3~4문장(articleSummary)
+5. 총 ${targetCardCount}장의 카드 문구(cards):
    - 1번 카드는 표지(role: "표지"), 나머지는 본문(role: "본문")
    - 각 카드의 titleText는 2줄 줄바꿈(\\n)과 핵심 강조구간 [대괄호] 포함
-5. 인스타그램 업로드용 상세 캡션 및 해시태그(caption)
+6. 인스타그램 업로드용 상세 캡션 및 해시태그(caption)
 
 반드시 아래 JSON 형식으로만 응답해 주세요:
 {
   "projectTitle": "프로젝트 주제어",
+  "coverImagePrompt": "A close-up cinematic portrait photograph of Warren Buffett drinking Coca-Cola from a can, textless, clean background, 8k",
   "recommendedTitles": [
     {
       "id": "rec_1",
@@ -247,8 +256,22 @@ ${rawText}
 }
 `;
 
+    const parts: any[] = [];
+    if (referenceImageUrl && referenceImageUrl.startsWith('data:image/')) {
+      const match = referenceImageUrl.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/);
+      if (match) {
+        parts.push({
+          inlineData: {
+            mimeType: match[1],
+            data: match[2],
+          },
+        });
+      }
+    }
+    parts.push({ text: prompt });
+
     const data = await callGeminiApiWithFallback(apiKey, {
-      contents: [{ parts: [{ text: prompt }] }],
+      contents: [{ parts }],
       generationConfig: {
         responseMimeType: 'application/json',
       },
@@ -263,25 +286,22 @@ ${rawText}
     }
     const parsed = JSON.parse(cleanJson);
 
-    // Build cards: Use user's uploaded reference image for Card 1!
-    // If no uploaded image, dynamically generate an AI image matching the actual title!
+    // Build cards: Generate clean, text-free background photo for Card 1!
+    // Preserves originalUploadUrl so user can toggle back to raw upload if desired
     const generatedCards: CardItem[] = await Promise.all(
       (parsed.cards || []).map(async (c: any, idx: number) => {
         let cardPhotoUrl = '';
         let hasPhoto = false;
 
-        if (idx === 0 && referenceImageUrl) {
-          // 1. 사용자가 직접 올린 원본 이미지를 표지(Card 1)에 1순위로 즉시 적용
-          cardPhotoUrl = referenceImageUrl;
-          hasPhoto = true;
-        } else if (idx === 0 && !referenceImageUrl) {
-          // 2. 사용자가 사진을 올리지 않은 경우, AI가 제목에 맞는 이미지를 실시간 생성
+        if (idx === 0) {
           try {
-            const cleanTitle = (c.titleText || parsed.projectTitle || 'card news background').replace(/\[|\]|\n/g, ' ');
-            cardPhotoUrl = await generateCardImageAI(cleanTitle);
+            const cleanPrompt = parsed.coverImagePrompt || (c.titleText || parsed.projectTitle || 'clean photograph').replace(/\[|\]|\n/g, ' ');
+            cardPhotoUrl = await generateCardImageAI(cleanPrompt);
             hasPhoto = true;
           } catch {
-            hasPhoto = false;
+            const fallbackKeyword = (parsed.projectTitle || c.titleText || 'candid photography').replace(/\[|\]|\n/g, ' ');
+            cardPhotoUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(fallbackKeyword + ' textless clean photograph no words 8k')}?width=1080&height=1350&nologo=true`;
+            hasPhoto = true;
           }
         }
 
@@ -292,6 +312,7 @@ ${rawText}
           photo: {
             hasPhoto,
             url: cardPhotoUrl,
+            originalUploadUrl: (idx === 0 && referenceImageUrl) ? referenceImageUrl : '',
             promptMode: 'auto',
             styleHint: '',
             scale: 100,
@@ -345,7 +366,10 @@ export async function generateCardImageAI(
   keyword: string,
   styleHint: string = ''
 ): Promise<string> {
-  const query = encodeURIComponent(`${keyword} ${styleHint} dark cinematic high quality aesthetic photography 8k`);
+  const cleanKeyword = keyword.replace(/\[|\]/g, ' ').trim();
+  const query = encodeURIComponent(
+    `${cleanKeyword} ${styleHint} photorealistic high quality clean photograph textless no words no text no typography no watermark 8k`.trim()
+  );
   return `https://image.pollinations.ai/prompt/${query}?width=1080&height=1350&nologo=true&seed=${Math.floor(
     Math.random() * 1000000
   )}`;

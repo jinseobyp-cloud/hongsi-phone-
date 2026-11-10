@@ -389,16 +389,9 @@ export const HongsiPhoneProvider: React.FC<{ children: React.ReactNode }> = ({ c
       const fallbackTitle = formatFallbackTitle(lines[0] || '스마트폰 카드뉴스', '핵심 내용');
       const targetCount = Math.max(1, state.sourceInput.targetCardCount || 2);
 
-      let card1Url = '';
-      let hasCard1Photo = false;
-      if (state.sourceInput.referenceImageUrl) {
-        card1Url = state.sourceInput.referenceImageUrl;
-        hasCard1Photo = true;
-      } else {
-        const topicKeyword = lines[0]?.slice(0, 20) || 'card news background';
-        card1Url = `https://image.pollinations.ai/prompt/${encodeURIComponent(topicKeyword + ' clean photography')}?width=1080&height=1350&nologo=true`;
-        hasCard1Photo = true;
-      }
+      const topicKeyword = lines[0]?.slice(0, 35) || 'candid photography';
+      const card1Url = `https://image.pollinations.ai/prompt/${encodeURIComponent(topicKeyword + ' clean photograph textless no words 8k')}?width=1080&height=1350&nologo=true`;
+      const hasCard1Photo = true;
 
       const fallbackCards: CardItem[] = Array.from({ length: targetCount }, (_, idx) => ({
         cardId: idx + 1,
@@ -407,6 +400,7 @@ export const HongsiPhoneProvider: React.FC<{ children: React.ReactNode }> = ({ c
         photo: {
           hasPhoto: idx === 0 ? hasCard1Photo : false,
           url: idx === 0 ? card1Url : '',
+          originalUploadUrl: (idx === 0 && state.sourceInput.referenceImageUrl) ? state.sourceInput.referenceImageUrl : '',
           promptMode: 'auto',
           styleHint: '',
           scale: 100,
