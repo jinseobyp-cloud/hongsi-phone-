@@ -7,6 +7,12 @@
       if (/kakaotalk/i.test(navigator.userAgent)) {
         window.location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(window.location.href);
       }
+      // PWA 원클릭 설치 프롬프트 전역 캡처
+      window.deferredInstallPrompt = null;
+      window.addEventListener('beforeinstallprompt', function(e) {
+        e.preventDefault();
+        window.deferredInstallPrompt = e;
+      });
     </script>
     <link rel="icon" type="image/png" sizes="192x192" href="./hongsi_icon_192.png?v=5" />
     <link rel="icon" type="image/png" sizes="512x512" href="./hongsi_icon_512.png?v=5" />

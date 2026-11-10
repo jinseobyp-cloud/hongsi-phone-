@@ -59,15 +59,17 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({ isOpen, onClos
       return;
     }
 
-    if (deferredPrompt) {
+    const promptEvent = deferredPrompt || (window as any).deferredInstallPrompt;
+    if (promptEvent) {
       try {
-        await deferredPrompt.prompt();
-        const choiceResult = await deferredPrompt.userChoice;
+        await promptEvent.prompt();
+        const choiceResult = await promptEvent.userChoice;
         if (choiceResult.outcome === 'accepted') {
           setIsInstalled(true);
           onClose();
         }
         setDeferredPrompt(null);
+        (window as any).deferredInstallPrompt = null;
       } catch (err) {
         setShowManualGuide(true);
       }
@@ -197,13 +199,32 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({ isOpen, onClos
             </button>
 
             {showManualGuide && (
-              <div className="p-3 bg-orange-50 dark:bg-orange-950/40 rounded-xl border border-orange-200 dark:border-orange-800 text-xs text-slate-700 dark:text-slate-200 space-y-2 animate-in fade-in slide-in-from-top-1">
-                <p className="font-bold text-orange-800 dark:text-orange-300">
-                  📱 수동 설치 안내 (1초 완료):
+              <div className="p-3.5 bg-orange-50 dark:bg-orange-950/40 rounded-xl border border-orange-200 dark:border-orange-800 text-xs text-slate-700 dark:text-slate-200 space-y-2 animate-in fade-in slide-in-from-top-1 text-left">
+                <p className="font-bold text-orange-800 dark:text-orange-300 flex items-center space-x-1.5">
+                  <Smartphone className="w-4 h-4 text-orange-600 shrink-0" />
+                  <span>삼성 인터넷 / 크롬 설치 방법 (1초 완료):</span>
                 </p>
-                <p className="text-[11px] leading-relaxed">
-                  브라우저 메뉴(우측 상단 <strong>⋮</strong> 또는 하단 <strong>☰</strong>)를 누르신 후 <strong>[홈 화면에 추가]</strong> 또는 <strong>[앱 설치]</strong>를 눌러주시면 즉시 홈 화면에 생성됩니다!
-                </p>
+                <div className="text-[11px] leading-relaxed space-y-2 pl-1">
+                  <div className="p-2 bg-white dark:bg-slate-800 rounded-lg border border-orange-200 dark:border-orange-800/60 shadow-2xs">
+                    <p className="font-bold text-slate-900 dark:text-white">
+                      🔹 방법 ① (가장 빠름):
+                    </p>
+                    <p className="text-slate-600 dark:text-slate-300 mt-0.5">
+                      브라우저 메뉴창 맨 윗줄의 <strong>[ ⬇️ ] (다운로드/설치 아이콘)</strong>을 누르세요.
+                    </p>
+                  </div>
+                  <div className="p-2 bg-white dark:bg-slate-800 rounded-lg border border-orange-200 dark:border-orange-800/60 shadow-2xs">
+                    <p className="font-bold text-slate-900 dark:text-white">
+                      🔹 방법 ② (메뉴 목록에서):
+                    </p>
+                    <p className="text-slate-600 dark:text-slate-300 mt-0.5">
+                      메뉴 아래쪽의 <strong>[ 🖥️ 설치 및 바로가기 만들기 ]</strong> ➡️ <strong>[홈 화면]</strong>을 누르세요.
+                    </p>
+                  </div>
+                  <p className="text-slate-500 text-[10px] pt-1">
+                    💡 설치 후 홈 화면의 <strong>홍시 아이콘</strong>으로 실행하면 상하단 주소창과 검은 바가 100% 사라지고 <strong>전체화면</strong>으로 실행됩니다!
+                  </p>
+                </div>
               </div>
             )}
 
