@@ -68,8 +68,25 @@ export const Module4_CardTab: React.FC = () => {
                   </span>
                 </div>
 
-                {/* 1. AI Text Removal & AI Clean Photo Dual Action */}
+                {/* 1. AI Text Removal & Restore Actions */}
                 <div className="space-y-1.5">
+                  {/* 원본 사진 복원 버튼 (엉뚱한 사진이 나왔을 때 즉시 원래 인물로 되돌리기) */}
+                  {(activeCard?.photo.originalUploadUrl || state.sourceInput.referenceImageUrl) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const original = activeCard?.photo.originalUploadUrl || state.sourceInput.referenceImageUrl;
+                        if (original) {
+                          updateCardPhoto({ url: original, scale: 100, offsetY: 0, hasPhoto: true });
+                        }
+                      }}
+                      className="w-full py-2 px-3 rounded-xl bg-orange-100 hover:bg-orange-200 dark:bg-orange-950/60 dark:hover:bg-orange-900 border border-orange-300 dark:border-orange-800 text-orange-950 dark:text-orange-200 font-extrabold text-xs shadow-2xs flex items-center justify-center space-x-1.5 transition active:scale-[0.98]"
+                    >
+                      <RotateCw className="w-3.5 h-3.5 text-orange-700" />
+                      <span>⏪ 원래 인물 사진으로 즉시 복원하기</span>
+                    </button>
+                  )}
+
                   <button
                     type="button"
                     onClick={() => removeTextFromCardPhoto()}
@@ -82,10 +99,10 @@ export const Module4_CardTab: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => generateCleanPhotoForCard()}
-                    className="w-full py-2 px-3 rounded-xl bg-white dark:bg-slate-800 border border-purple-300 dark:border-purple-800 hover:bg-purple-50 dark:hover:bg-purple-950/40 text-purple-700 dark:text-purple-300 font-extrabold text-xs shadow-2xs flex items-center justify-center space-x-1.5 transition active:scale-[0.98]"
+                    className="w-full py-1.5 px-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-100 text-slate-600 dark:text-slate-300 font-bold text-[11px] flex items-center justify-center space-x-1.5 transition"
                   >
-                    <ImageIcon className="w-3.5 h-3.5 text-purple-600" />
-                    <span>🎨 글씨 없는 초고화질 깨끗한 사진으로 교체</span>
+                    <ImageIcon className="w-3 h-3 text-slate-400" />
+                    <span>새로운 가상 인물로 AI 사진 새로 그리기</span>
                   </button>
                 </div>
 
