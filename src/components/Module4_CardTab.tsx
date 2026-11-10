@@ -55,57 +55,43 @@ export const Module4_CardTab: React.FC = () => {
               현재 선택된 카드 {state.activeCardIndex + 1}의 배경 이미지를 생성하거나 교체합니다.
             </p>
 
-            {/* Original vs Clean AI Photo Switcher (원본 이미지가 있을 때) */}
-            {(activeCard?.photo.originalUploadUrl || state.sourceInput.referenceImageUrl) && (
+            {/* Photo Adjust & Subtitle Crop Controls */}
+            {(activeCard?.photo.hasPhoto && (activeCard?.photo.originalUploadUrl || state.sourceInput.referenceImageUrl || activeCard?.photo.url)) && (
               <div className="p-3 rounded-2xl bg-[#FFF9F5] dark:bg-orange-950/30 border border-orange-200 dark:border-orange-900/60 space-y-2">
                 <div className="flex items-center justify-between text-xs font-bold text-orange-950 dark:text-orange-200">
-                  <span>사진 모드 선택</span>
-                  <span className="text-[10px] text-orange-600 dark:text-orange-400 font-semibold">✨ 글씨 없는 깨끗한 사진 권장</span>
+                  <span>사진 글씨 가리기 / 위치 조절</span>
+                  <span className="text-[10px] text-orange-600 dark:text-orange-400 font-semibold">
+                    {activeCard?.photo.scale}% 확대 · 세로 {activeCard?.photo.offsetY}px
+                  </span>
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-xs font-bold">
                   <button
                     type="button"
                     onClick={() => {
-                      if (activeCard.photo.url === (activeCard.photo.originalUploadUrl || state.sourceInput.referenceImageUrl)) {
-                        runGenerateImage();
-                      }
+                      updateCardPhoto({ scale: 135, offsetY: 20, offsetX: 0 });
                     }}
                     className={`py-2 px-2 rounded-xl border text-center transition flex items-center justify-center space-x-1 ${
-                      activeCard?.photo.url !== (activeCard?.photo.originalUploadUrl || state.sourceInput.referenceImageUrl)
+                      activeCard?.photo.scale >= 130
                         ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-200 shadow-xs'
-                        : 'border-slate-200 bg-white dark:bg-slate-800 text-slate-600'
+                        : 'border-slate-200 bg-white dark:bg-slate-800 text-slate-600 hover:bg-slate-50'
                     }`}
                   >
-                    <span>✨ AI 글씨제거 사진</span>
+                    <span>✂️ 하단 글씨 가리기 (확대)</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => {
-                      const rawUrl = activeCard?.photo.originalUploadUrl || state.sourceInput.referenceImageUrl;
-                      if (rawUrl) {
-                        updateCardPhoto({ url: rawUrl, hasPhoto: true });
-                      }
+                      updateCardPhoto({ scale: 100, offsetY: 0, offsetX: 0 });
                     }}
                     className={`py-2 px-2 rounded-xl border text-center transition flex items-center justify-center space-x-1 ${
-                      activeCard?.photo.url === (activeCard?.photo.originalUploadUrl || state.sourceInput.referenceImageUrl)
+                      activeCard?.photo.scale === 100 && activeCard?.photo.offsetY === 0
                         ? 'border-orange-500 bg-orange-100 dark:bg-orange-950/60 text-orange-950 dark:text-orange-200 shadow-xs'
-                        : 'border-slate-200 bg-white dark:bg-slate-800 text-slate-600'
+                        : 'border-slate-200 bg-white dark:bg-slate-800 text-slate-600 hover:bg-slate-50'
                     }`}
                   >
-                    <span>📷 업로드 원본 사진</span>
+                    <span>🔄 원본 비율 (100%)</span>
                   </button>
                 </div>
-                {activeCard?.photo.url === (activeCard?.photo.originalUploadUrl || state.sourceInput.referenceImageUrl) && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      updateCardPhoto({ scale: 135, offsetY: -35 });
-                    }}
-                    className="w-full py-2 rounded-xl bg-white dark:bg-slate-800 border border-orange-300 dark:border-orange-800 text-orange-800 dark:text-orange-300 text-[11px] font-bold hover:bg-orange-50 transition flex items-center justify-center space-x-1.5 shadow-2xs"
-                  >
-                    <span>✂️ 하단 자막/글씨 자동 잘라내기 (확대)</span>
-                  </button>
-                )}
               </div>
             )}
 

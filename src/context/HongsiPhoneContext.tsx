@@ -389,9 +389,21 @@ export const HongsiPhoneProvider: React.FC<{ children: React.ReactNode }> = ({ c
       const fallbackTitle = formatFallbackTitle(lines[0] || '스마트폰 카드뉴스', '핵심 내용');
       const targetCount = Math.max(1, state.sourceInput.targetCardCount || 2);
 
-      const topicKeyword = lines[0]?.slice(0, 35) || 'candid photography';
-      const card1Url = `https://image.pollinations.ai/prompt/${encodeURIComponent(topicKeyword + ' clean photograph textless no words 8k')}?width=1080&height=1350&nologo=true`;
-      const hasCard1Photo = true;
+      let card1Url = '';
+      let hasCard1Photo = false;
+      let card1Scale = 100;
+      let card1OffsetY = 0;
+
+      if (state.sourceInput.referenceImageUrl) {
+        card1Url = state.sourceInput.referenceImageUrl;
+        hasCard1Photo = true;
+        card1Scale = 135;
+        card1OffsetY = 20;
+      } else {
+        const topicKeyword = lines[0]?.slice(0, 35) || 'clean background';
+        card1Url = `https://image.pollinations.ai/prompt/${encodeURIComponent(topicKeyword + ' clean background photography 8k')}?width=1080&height=1350&nologo=true`;
+        hasCard1Photo = true;
+      }
 
       const fallbackCards: CardItem[] = Array.from({ length: targetCount }, (_, idx) => ({
         cardId: idx + 1,
@@ -403,9 +415,9 @@ export const HongsiPhoneProvider: React.FC<{ children: React.ReactNode }> = ({ c
           originalUploadUrl: (idx === 0 && state.sourceInput.referenceImageUrl) ? state.sourceInput.referenceImageUrl : '',
           promptMode: 'auto',
           styleHint: '',
-          scale: 100,
+          scale: idx === 0 ? card1Scale : 100,
           offsetX: 0,
-          offsetY: 0,
+          offsetY: idx === 0 ? card1OffsetY : 0,
           isGrayscale: false,
         },
         typography: {
@@ -420,8 +432,8 @@ export const HongsiPhoneProvider: React.FC<{ children: React.ReactNode }> = ({ c
         },
         gradient: {
           enabled: true,
-          heightPercent: 55,
-          opacity: 0.9,
+          heightPercent: idx === 0 && state.sourceInput.referenceImageUrl ? 60 : 55,
+          opacity: 0.95,
         },
       }));
 

@@ -134,19 +134,23 @@ export async function analyzeContentWithAI(
   const userFallbackTitle = formatFallbackTitle(cleanLines[0] || '스마트폰 카드뉴스', '핵심 비결');
 
   if (!apiKey || !apiKey.trim()) {
-    // Local simulation: Generate clean, text-free AI photo based on topic/reference
-    const topicKeyword = cleanLines[0]?.slice(0, 35) || 'candid photograph';
+    // Local simulation: Use user's uploaded photo (Warren Buffett) if provided!
     let card1Url = '';
     let hasCard1Photo = false;
+    let card1Scale = 100;
+    let card1OffsetY = 0;
 
-    try {
-      card1Url = await generateCardImageAI(
-        `photorealistic clean photograph of ${topicKeyword}`,
-        'candid portrait textless no words no text no subtitles 8k'
-      );
+    if (referenceImageUrl) {
+      // 사용자가 직접 올린 원본 사진을 100% 그대로 적용
+      // 하단 자막/글씨는 가려지고 인물(피사체)이 중앙에 오도록 스마트 확대(scale: 135) 및 위치(offsetY: 20) 기본 적용
+      card1Url = referenceImageUrl;
       hasCard1Photo = true;
-    } catch {
-      card1Url = `https://image.pollinations.ai/prompt/${encodeURIComponent(topicKeyword + ' clean photograph textless no words 8k')}?width=1080&height=1350&nologo=true`;
+      card1Scale = 135;
+      card1OffsetY = 20;
+    } else {
+      // 사진이 없을 때만 키워드 배경 이미지 생성
+      const topicKeyword = cleanLines[0]?.slice(0, 35) || 'clean background';
+      card1Url = `https://image.pollinations.ai/prompt/${encodeURIComponent(topicKeyword + ' clean background photography 8k')}?width=1080&height=1350&nologo=true`;
       hasCard1Photo = true;
     }
 
@@ -160,9 +164,9 @@ export async function analyzeContentWithAI(
         originalUploadUrl: (idx === 0 && referenceImageUrl) ? referenceImageUrl : '',
         promptMode: 'auto',
         styleHint: '',
-        scale: 100,
+        scale: idx === 0 ? card1Scale : 100,
         offsetX: 0,
-        offsetY: 0,
+        offsetY: idx === 0 ? card1OffsetY : 0,
         isGrayscale: false,
       },
       typography: {
@@ -177,8 +181,8 @@ export async function analyzeContentWithAI(
       },
       gradient: {
         enabled: true,
-        heightPercent: 55,
-        opacity: 0.9,
+        heightPercent: idx === 0 && referenceImageUrl ? 60 : 55,
+        opacity: 0.95,
       },
     }));
 
@@ -292,16 +296,27 @@ ${rawText}
       (parsed.cards || []).map(async (c: any, idx: number) => {
         let cardPhotoUrl = '';
         let hasPhoto = false;
+        let cardScale = 100;
+        let cardOffsetY = 0;
 
         if (idx === 0) {
-          try {
-            const cleanPrompt = parsed.coverImagePrompt || (c.titleText || parsed.projectTitle || 'clean photograph').replace(/\[|\]|\n/g, ' ');
-            cardPhotoUrl = await generateCardImageAI(cleanPrompt);
+          if (referenceImageUrl) {
+            // 사용자가 올린 실제 사진(워런 버핏 등)을 최우선 적용
+            // 하단 자막/글씨는 가리고 인물이 화면 중앙에 오도록 스마트 확대(135%) 및 세로 오프셋(20px) 기본 적용
+            cardPhotoUrl = referenceImageUrl;
             hasPhoto = true;
-          } catch {
-            const fallbackKeyword = (parsed.projectTitle || c.titleText || 'candid photography').replace(/\[|\]|\n/g, ' ');
-            cardPhotoUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(fallbackKeyword + ' textless clean photograph no words 8k')}?width=1080&height=1350&nologo=true`;
-            hasPhoto = true;
+            cardScale = 135;
+            cardOffsetY = 20;
+          } else {
+            try {
+              const cleanPrompt = parsed.coverImagePrompt || (c.titleText || parsed.projectTitle || 'clean photograph').replace(/\[|\]|\n/g, ' ');
+              cardPhotoUrl = await generateCardImageAI(cleanPrompt);
+              hasPhoto = true;
+            } catch {
+              const fallbackKeyword = (parsed.projectTitle || c.titleText || 'candid photography').replace(/\[|\]|\n/g, ' ');
+              cardPhotoUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(fallbackKeyword + ' textless clean photograph no words 8k')}?width=1080&height=1350&nologo=true`;
+              hasPhoto = true;
+            }
           }
         }
 
@@ -315,9 +330,9 @@ ${rawText}
             originalUploadUrl: (idx === 0 && referenceImageUrl) ? referenceImageUrl : '',
             promptMode: 'auto',
             styleHint: '',
-            scale: 100,
+            scale: idx === 0 ? cardScale : 100,
             offsetX: 0,
-            offsetY: 0,
+            offsetY: idx === 0 ? cardOffsetY : 0,
             isGrayscale: false,
           },
           typography: {
@@ -332,8 +347,8 @@ ${rawText}
           },
           gradient: {
             enabled: true,
-            heightPercent: 55,
-            opacity: 0.9,
+            heightPercent: idx === 0 && referenceImageUrl ? 60 : 55,
+            opacity: 0.95,
           },
         };
       })
