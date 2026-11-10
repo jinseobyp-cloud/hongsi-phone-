@@ -456,3 +456,129 @@ export async function removeTextFromImageWithAI(
 
   throw new Error('AI 글씨 제거를 처리할 수 없습니다. 제미나이 웹에서 생성된 깨끗한 사진을 업로드해 보세요.');
 }
+
+export interface ExtractedUrlContent {
+  title: string;
+  imageUrl: string;
+  bodyText: string;
+}
+
+/**
+ * 뉴스, 블로그, SNS 링크에서 상단 대표 사진과 본문/캡션 글을 추출합니다.
+ * 추출된 이미지는 캔버스 렌더링 및 편집이 가능하도록 Base64로 자동 변환됩니다.
+ */
+export async function extractContentFromUrl(url: string): Promise<ExtractedUrlContent> {
+  const cleanUrl = (url || '').trim();
+  if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
+    throw new Error('올바른 웹 주소(http:// 또는 https://)를 입력해 주세요.');
+  }
+
+  let title = '';
+  let rawImageUrl = '';
+  let bodyText = '';
+
+  // 1. Microlink API 메타데이터 추출 (og:image, title, og:description)
+  try {
+    const mRes = await fetch(`https://api.microlink.io?url=${encodeURIComponent(cleanUrl)}`, {
+      signal: AbortSignal.timeout(6000),
+    });
+    if (mRes.ok) {
+      const mData = await mRes.json();
+      if (mData.status === 'success' && mData.data) {
+        if (mData.data.title) title = mData.data.title;
+        if (mData.data.image?.url) rawImageUrl = mData.data.image.url;
+        if (mData.data.description) bodyText = mData.data.description;
+      }
+    }
+  } catch (e) {
+    console.warn('Microlink extraction warning:', e);
+  }
+
+  // 2. Jina Reader API 본문 및 이미지 추출 (마크다운 기반 전문 파싱)
+  try {
+    const jRes = await fetch(`https://r.jina.ai/${cleanUrl}`, {
+      headers: { Accept: 'application/json' },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (jRes.ok) {
+      const jData = await jRes.json();
+      if (!title && jData.data?.title) title = jData.data.title;
+
+      const content = jData.data?.content || '';
+
+      // 본문 내 대표 이미지 URL 추출 (이미지가 비어있을 경우)
+      if (!rawImageUrl) {
+        const imgMatch = content.match(/!\[([^\]]*)\]\((https?:\/\/[^\s\)]+)\)/);
+        if (imgMatch && imgMatch[2]) {
+          rawImageUrl = imgMatch[2];
+        } else if (jData.data?.images) {
+          const imgs = Object.keys(jData.data.images);
+          if (imgs.length > 0) rawImageUrl = imgs[0];
+        }
+      }
+
+      // 본문 텍스트 정제 (메뉴, 링크, 광고, 저작권 문구 제외)
+      const cleanLines = content
+        .split('\n')
+        .map((l: string) => l.trim())
+        .filter((l: string) => {
+          if (!l || l.length < 8) return false;
+          if (l.startsWith('![') || (l.startsWith('[') && l.endsWith(')'))) return false;
+          if (l.startsWith('http://') || l.startsWith('https://')) return false;
+          if (/저작권자|무단\s*전재|재배포\s*금지|구독|로그인|회원가입|댓글|공유하기|음성\s*재생|텍스트\s*음성|바로가기/i.test(l)) return false;
+          return true;
+        });
+
+      const parsedBody = cleanLines.join('\n\n');
+      if (parsedBody.length > bodyText.length) {
+        bodyText = parsedBody;
+      }
+    }
+  } catch (e) {
+    console.warn('Jina content extraction warning:', e);
+  }
+
+  if (!bodyText && title) {
+    bodyText = title;
+  }
+
+  // 3. 추출된 이미지를 Base64 Data URL로 변환하여 캔버스 Taint 방지 및 일관된 처리
+  let finalImageUrl = rawImageUrl;
+  if (rawImageUrl && !rawImageUrl.startsWith('data:')) {
+    try {
+      const imgRes = await fetch(rawImageUrl, { signal: AbortSignal.timeout(5000) });
+      if (imgRes.ok) {
+        const blob = await imgRes.blob();
+        finalImageUrl = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.onerror = () => resolve(rawImageUrl);
+          reader.readAsDataURL(blob);
+        });
+      }
+    } catch {
+      // CORS 문제 발생 시 프록시 우회 시도
+      try {
+        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(rawImageUrl)}`;
+        const pRes = await fetch(proxyUrl, { signal: AbortSignal.timeout(5000) });
+        if (pRes.ok) {
+          const blob = await pRes.blob();
+          finalImageUrl = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.onerror = () => resolve(rawImageUrl);
+            reader.readAsDataURL(blob);
+          });
+        }
+      } catch {
+        finalImageUrl = rawImageUrl;
+      }
+    }
+  }
+
+  return {
+    title,
+    imageUrl: finalImageUrl,
+    bodyText: bodyText.slice(0, 3000), // 최대 3,000자까지 안전하게 유지
+  };
+}

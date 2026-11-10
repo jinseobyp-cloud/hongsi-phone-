@@ -41,6 +41,8 @@ export const Module3_SourceTab: React.FC = () => {
     exportZip,
     loadSampleProject,
     clearAllContent,
+    isLinkFetching,
+    fetchAndApplyLinkSource,
   } = useHongsiPhone();
 
   // Accordion open/close state (1: 원문 넣기, 2: AI 추천 제목, 3: AI 배경 이미지, 4: 번역 & 내보내기)
@@ -311,8 +313,57 @@ export const Module3_SourceTab: React.FC = () => {
                       </button>
                     )}
                   </div>
+
+                  {/* 링크에서 사진 & 본문 실시간 가져오기 버튼 */}
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const success = await fetchAndApplyLinkSource();
+                      if (success) {
+                        alert('✨ 링크에서 상단 대표 사진과 본문 글을 성공적으로 가져왔습니다!\n아래 [원본 이미지]와 [분석하고 카드 생성]을 확인해 보세요.');
+                      }
+                    }}
+                    disabled={isLinkFetching || !state.sourceInput.sourceUrl.trim()}
+                    className={`w-full py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center space-x-1.5 transition shadow-2xs ${
+                      isLinkFetching || !state.sourceInput.sourceUrl.trim()
+                        ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed border border-slate-200 dark:border-slate-700'
+                        : 'bg-[#5C4028] hover:bg-[#47301C] text-white active:scale-[0.99]'
+                    }`}
+                  >
+                    {isLinkFetching ? (
+                      <>
+                        <Sparkles className="w-3.5 h-3.5 text-yellow-300 animate-spin" />
+                        <span>링크 사진 & 본문 가져오는 중...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Download className="w-3.5 h-3.5" />
+                        <span>📥 링크에서 사진 & 본문 글 가져오기</span>
+                      </>
+                    )}
+                  </button>
+
+                  {/* 가져온 본문 글 미리보기 배너 */}
+                  {state.sourceInput.rawText && state.sourceInput.inputType === 'link' && (
+                    <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900 text-xs text-emerald-900 dark:text-emerald-200 flex items-center justify-between">
+                      <div className="truncate flex-1 pr-2">
+                        <span className="font-extrabold mr-1">✅ 추출된 본문:</span>
+                        <span className="text-[11px] text-emerald-700 dark:text-emerald-300">
+                          {state.sourceInput.rawText.slice(0, 40)}... ({state.sourceInput.rawText.length.toLocaleString()}자)
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSourceInputType('paste')}
+                        className="underline text-[11px] text-emerald-800 dark:text-emerald-200 font-bold shrink-0 hover:text-emerald-950"
+                      >
+                        본문 확인
+                      </button>
+                    </div>
+                  )}
+
                   <p className="text-[10px] text-[#9E958B] dark:text-slate-500 leading-relaxed">
-                    뉴스·블로그 글이나 공개된 인스타 릴스/게시물 주소를 넣으면 본문 글과 이미지를 가져와 분석하고, 이미지는 카드 사진으로 바로 쓸 수 있습니다.
+                    뉴스·블로그 글이나 웹 링크 주소를 넣고 <b>[분석하고 카드 생성]</b>을 누르면 상단 사진은 <b>원본 이미지</b>에, 아래 본문 글은 <b>글 붙여넣기</b>와 <b>본문 핵심 요약 및 5개 추천 제목</b>으로 자동 처리됩니다.
                   </p>
                 </div>
               )}

@@ -20,7 +20,7 @@ import {
   generateBlankCards,
 } from '../services/mockAiService';
 import { exportCardsAsZip } from '../utils/exportZip';
-import { analyzeContentWithAI, generateCardImageAI, formatFallbackTitle, removeTextFromImageWithAI } from '../services/geminiService';
+import { analyzeContentWithAI, generateCardImageAI, formatFallbackTitle, removeTextFromImageWithAI, extractContentFromUrl } from '../services/geminiService';
 import {
   fetchServerAuthInfo,
   verifyPasswordMatch,
@@ -41,8 +41,10 @@ interface HongsiPhoneContextType {
   colorPickerTarget: 'base' | 'accent';
   isCropMode: boolean;
   isDarkMode: boolean;
+  isLinkFetching: boolean;
 
   // Actions
+  fetchAndApplyLinkSource: (urlOverride?: string) => Promise<boolean>;
   setApiKey: (key: string) => void;
   startStudio: () => void;
   setActiveMainTab: (tab: MainTab) => void;
@@ -199,6 +201,7 @@ export const HongsiPhoneProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const [isLanding, setIsLanding] = useState<boolean>(true);
   const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
   const [isCropMode, setIsCropMode] = useState<boolean>(false);
+  const [isLinkFetching, setIsLinkFetching] = useState<boolean>(false);
 
   // Stepper Modals state
   const [isAnalyzingModalOpen, setIsAnalyzingModalOpen] = useState<boolean>(false);
@@ -336,6 +339,58 @@ export const HongsiPhoneProvider: React.FC<{ children: React.ReactNode }> = ({ c
     });
   };
 
+  const fetchAndApplyLinkSource = async (urlOverride?: string): Promise<boolean> => {
+    const targetUrl = (urlOverride || state.sourceInput.sourceUrl || '').trim();
+    if (!targetUrl) {
+      alert('가져올 웹페이지/뉴스/블로그 링크를 입력해 주세요.');
+      return false;
+    }
+
+    setIsLinkFetching(true);
+    try {
+      const extracted = await extractContentFromUrl(targetUrl);
+      if (!extracted.bodyText && !extracted.imageUrl) {
+        throw new Error('링크에서 본문 내용이나 대표 이미지를 가져오지 못했습니다.');
+      }
+
+      setState((prev) => {
+        const updatedCards = [...prev.cards];
+        if (extracted.imageUrl && updatedCards[0]) {
+          updatedCards[0] = {
+            ...updatedCards[0],
+            photo: {
+              ...updatedCards[0].photo,
+              hasPhoto: true,
+              url: extracted.imageUrl,
+              scale: 100,
+              offsetY: 0,
+            },
+          };
+        }
+
+        return {
+          ...prev,
+          projectTitle: extracted.title ? extracted.title.slice(0, 30) : prev.projectTitle,
+          sourceInput: {
+            ...prev.sourceInput,
+            rawText: extracted.bodyText || prev.sourceInput.rawText,
+            referenceImageUrl: extracted.imageUrl || prev.sourceInput.referenceImageUrl,
+          },
+          cards: updatedCards,
+          isSaved: false,
+        };
+      });
+
+      return true;
+    } catch (err: any) {
+      console.warn('fetchAndApplyLinkSource error:', err);
+      alert(`링크 가져오기 안내: ${err.message || '링크 정보를 불러오는 데 실패했습니다.'}\n\n직접 [글 붙여넣기]에 본문을 붙여넣고 [원본 이미지]에 사진을 올려주셔도 정상적으로 카드가 생성됩니다.`);
+      return false;
+    } finally {
+      setIsLinkFetching(false);
+    }
+  };
+
   const runSourceAnalysis = async () => {
     setIsAnalyzingModalOpen(true);
     setAnalyzingStep(0);
@@ -349,18 +404,42 @@ export const HongsiPhoneProvider: React.FC<{ children: React.ReactNode }> = ({ c
       state.apiKey ||
       (typeof window !== 'undefined' ? localStorage.getItem('hongsiphone_gemini_api_key') || '' : '');
 
+    let currentRawText = state.sourceInput.rawText;
+    let currentRefImage = state.sourceInput.referenceImageUrl;
+
+    // 링크로 가져오기 모드인 경우, 링크에서 본문과 사진을 실시간 자동 추출하여 처리
+    if (state.sourceInput.inputType === 'link' && state.sourceInput.sourceUrl) {
+      try {
+        const extracted = await extractContentFromUrl(state.sourceInput.sourceUrl);
+        if (extracted.bodyText && (!currentRawText || currentRawText.length < 50)) {
+          currentRawText = extracted.bodyText;
+        }
+        if (extracted.imageUrl && !currentRefImage) {
+          currentRefImage = extracted.imageUrl;
+        }
+        setState((prev) => ({
+          ...prev,
+          projectTitle: extracted.title ? extracted.title.slice(0, 30) : prev.projectTitle,
+          sourceInput: {
+            ...prev.sourceInput,
+            rawText: currentRawText,
+            referenceImageUrl: currentRefImage,
+          },
+        }));
+      } catch (linkErr) {
+        console.warn('URL extraction failed during runSourceAnalysis:', linkErr);
+      }
+    }
+
     try {
-      const textToAnalyze =
-        state.sourceInput.inputType === 'link'
-          ? `[출처 링크]: ${state.sourceInput.sourceUrl}\n${state.sourceInput.rawText}`
-          : state.sourceInput.rawText;
+      const textToAnalyze = currentRawText || (state.sourceInput.sourceUrl ? `[출처 링크]: ${state.sourceInput.sourceUrl}` : '');
 
       const aiResult = await analyzeContentWithAI(
         activeApiKey,
         textToAnalyze,
         state.sourceInput.targetCardCount,
         state.sourceInput.guideline,
-        state.sourceInput.referenceImageUrl
+        currentRefImage
       );
 
       // Brief animation completion then immediately switch to card tab
@@ -373,6 +452,11 @@ export const HongsiPhoneProvider: React.FC<{ children: React.ReactNode }> = ({ c
           cards: aiResult.cards,
           aiRecommendedTitles: aiResult.recommendedTitles,
           articleSummary: aiResult.articleSummary,
+          sourceInput: {
+            ...prev.sourceInput,
+            rawText: currentRawText || prev.sourceInput.rawText,
+            referenceImageUrl: currentRefImage || prev.sourceInput.referenceImageUrl,
+          },
           exportAndTranslate: {
             ...prev.exportAndTranslate,
             captionText: aiResult.caption,
@@ -385,7 +469,7 @@ export const HongsiPhoneProvider: React.FC<{ children: React.ReactNode }> = ({ c
     } catch (e) {
       console.warn('AI analysis failed, using fallback:', e);
       setIsAnalyzingModalOpen(false);
-      const raw = state.sourceInput.rawText || '';
+      const raw = currentRawText || state.sourceInput.rawText || '';
       const lines = raw.split('\n').map((l) => l.trim()).filter((l) => l.length > 0);
       const fallbackTitle = formatFallbackTitle(lines[0] || '스마트폰 카드뉴스', '핵심 내용');
       const targetCount = Math.max(1, state.sourceInput.targetCardCount || 2);
@@ -395,8 +479,8 @@ export const HongsiPhoneProvider: React.FC<{ children: React.ReactNode }> = ({ c
       let card1Scale = 100;
       let card1OffsetY = 0;
 
-      if (state.sourceInput.referenceImageUrl) {
-        card1Url = state.sourceInput.referenceImageUrl;
+      if (currentRefImage) {
+        card1Url = currentRefImage;
         hasCard1Photo = true;
         card1Scale = 100;
         card1OffsetY = 0;
@@ -413,7 +497,7 @@ export const HongsiPhoneProvider: React.FC<{ children: React.ReactNode }> = ({ c
         photo: {
           hasPhoto: idx === 0 ? hasCard1Photo : false,
           url: idx === 0 ? card1Url : '',
-          originalUploadUrl: (idx === 0 && state.sourceInput.referenceImageUrl) ? state.sourceInput.referenceImageUrl : '',
+          originalUploadUrl: (idx === 0 && currentRefImage) ? currentRefImage : '',
           promptMode: 'auto',
           styleHint: '',
           scale: idx === 0 ? card1Scale : 100,
@@ -433,7 +517,7 @@ export const HongsiPhoneProvider: React.FC<{ children: React.ReactNode }> = ({ c
         },
         gradient: {
           enabled: true,
-          heightPercent: idx === 0 && state.sourceInput.referenceImageUrl ? 60 : 55,
+          heightPercent: idx === 0 && currentRefImage ? 60 : 55,
           opacity: 0.95,
         },
       }));
@@ -1016,6 +1100,8 @@ export const HongsiPhoneProvider: React.FC<{ children: React.ReactNode }> = ({ c
         colorPickerTarget,
         isCropMode,
         isDarkMode,
+        isLinkFetching,
+        fetchAndApplyLinkSource,
         setApiKey,
         startStudio,
         setActiveMainTab,
