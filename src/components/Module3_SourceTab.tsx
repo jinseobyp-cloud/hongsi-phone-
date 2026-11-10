@@ -172,23 +172,22 @@ export const Module3_SourceTab: React.FC = () => {
               <p className="text-[11px] text-[#7A7167] dark:text-slate-400 leading-relaxed max-w-[260px]">
                 글을 붙여 넣거나 뉴스·블로그·인스타그램 링크를 가져올 수 있어요. 어느 나라 말이든 괜찮아요, 결과물은 한국어로 나옵니다.
               </p>
-              <div className="flex items-center space-x-2 shrink-0">
+              <div className="flex items-center space-x-1.5 shrink-0">
                 <button
                   type="button"
                   onClick={loadSampleStory}
-                  className="text-[11px] text-[#5C4028] dark:text-amber-400 font-bold hover:underline flex items-center space-x-1"
+                  className="px-2 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 text-[#5C4028] dark:text-amber-400 text-[11px] font-bold hover:bg-amber-100 dark:hover:bg-amber-900/60 transition flex items-center space-x-1"
                 >
-                  <span>🌱 샘플 불러오기</span>
+                  <span>🌱 샘플 사연 불러오기</span>
                 </button>
-                {state.sourceInput.rawText.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={clearAllContent}
-                    className="text-[11px] text-red-500 hover:text-red-700 font-bold hover:underline flex items-center space-x-1"
-                  >
-                    <span>🗑️ 비우기</span>
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={clearAllContent}
+                  className="px-2 py-1 rounded-lg bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 text-[#EF4444] text-[11px] font-bold hover:bg-red-100 dark:hover:bg-red-900/40 transition flex items-center space-x-1"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  <span>지우기</span>
+                </button>
               </div>
             </div>
 
