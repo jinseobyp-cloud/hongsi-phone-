@@ -4,8 +4,6 @@ import {
   DEFAULT_RECOMMENDED_TITLES,
   DEFAULT_SUMMARY,
   DEFAULT_CAPTION,
-  DEMO_GAMING_CHAIR_IMAGE,
-  BACKUP_CHAIR_IMAGE,
 } from './mockAiService';
 
 export interface AnalysisResult {
@@ -17,9 +15,10 @@ export interface AnalysisResult {
 }
 
 const CANDIDATE_MODELS = [
-  'gemini-3.8-flash',
   'gemini-2.0-flash',
+  'gemini-2.5-flash',
   'gemini-1.5-flash',
+  'gemini-1.5-pro',
 ];
 
 async function callGeminiApiWithFallback(apiKey: string, bodyPayload: any): Promise<any> {
@@ -113,81 +112,64 @@ export async function analyzeContentWithAI(
   apiKey: string | null,
   rawText: string,
   targetCardCount: number,
-  guideline: string = ''
+  guideline: string = '',
+  referenceImageUrl: string | null = null
 ): Promise<AnalysisResult> {
+  const cleanLines = (rawText || '').split('\n').map((l) => l.trim()).filter((l) => l.length > 0);
+  const userFallbackTitle = cleanLines[0] || '스마트폰 카드뉴스\n[핵심 내용]';
+
   if (!apiKey || !apiKey.trim()) {
-    // Mock simulation
+    // Local simulation using user's actual text and uploaded image
+    const simCards: CardItem[] = Array.from({ length: Math.max(1, targetCardCount) }, (_, idx) => ({
+      cardId: idx + 1,
+      role: idx === 0 ? '표지' : '본문',
+      titleText: idx === 0 ? userFallbackTitle : (cleanLines[idx] || `카드 ${idx + 1} 본문\n[상세 내용]`),
+      photo: {
+        hasPhoto: idx === 0 && !!referenceImageUrl,
+        url: (idx === 0 && referenceImageUrl) ? referenceImageUrl : '',
+        promptMode: 'auto',
+        styleHint: '',
+        scale: 100,
+        offsetX: 0,
+        offsetY: 0,
+        isGrayscale: false,
+      },
+      typography: {
+        fontSizePx: 26,
+        align: 'left',
+        fontWeight: 'extra-bold',
+        lineHeightPercent: 134,
+        letterSpacingPercent: -2,
+        baseColorHex: '#FFFFFF',
+        accentColorHex: '#1CF28D',
+        strokeWidthPx: 0,
+      },
+      gradient: {
+        enabled: true,
+        heightPercent: 55,
+        opacity: 0.9,
+      },
+    }));
+
     return {
-      projectTitle: '우주하마 엉덩이 건강',
-      recommendedTitles: DEFAULT_RECOMMENDED_TITLES,
-      articleSummary: DEFAULT_SUMMARY,
-      cards: [
+      projectTitle: userFallbackTitle.replace(/\[|\]|\n/g, ' ').slice(0, 20),
+      recommendedTitles: [
         {
-          cardId: 1,
-          role: '표지',
-          titleText: '220만 유튜버 우주하마\n[방송 중단하게 만든 질병]',
-          photo: {
-            hasPhoto: true,
-            url: DEMO_GAMING_CHAIR_IMAGE,
-            promptMode: 'auto',
-            styleHint: '',
-            scale: 100,
-            offsetX: 0,
-            offsetY: 0,
-            isGrayscale: false,
-          },
-          typography: {
-            fontSizePx: 26,
-            align: 'left',
-            fontWeight: 'extra-bold',
-            lineHeightPercent: 134,
-            letterSpacingPercent: -2,
-            baseColorHex: '#FFFFFF',
-            accentColorHex: '#1CF28D',
-            strokeWidthPx: 0,
-          },
-          gradient: {
-            enabled: true,
-            heightPercent: 55,
-            opacity: 0.9,
-          },
+          id: 'rec_1',
+          rawTitle: userFallbackTitle,
+          displayWithNewlineSymbol: userFallbackTitle.replace('\n', '\\n'),
+          score: '9.8/10',
+          reason: '입력된 원문의 핵심 메시지를 직접 반영',
+          isSelected: true,
         },
-        ...Array.from({ length: Math.max(1, targetCardCount - 1) }, (_, i) => ({
-          cardId: i + 2,
-          role: '본문' as const,
-          titleText: `의자에 오래 앉아 있다면\n[엉덩이 근육이 잠든다] (${i + 2}편)`,
-          photo: {
-            hasPhoto: false,
-            url: '',
-            promptMode: 'auto' as const,
-            styleHint: '',
-            scale: 100,
-            offsetX: 0,
-            offsetY: 0,
-            isGrayscale: false,
-          },
-          typography: {
-            fontSizePx: 24,
-            align: 'left' as const,
-            fontWeight: 'extra-bold' as const,
-            lineHeightPercent: 134,
-            letterSpacingPercent: -2,
-            baseColorHex: '#FFFFFF',
-            accentColorHex: '#1CF28D',
-            strokeWidthPx: 0,
-          },
-          gradient: {
-            enabled: true,
-            heightPercent: 55,
-            opacity: 0.9,
-          },
-        })),
       ],
-      caption: DEFAULT_CAPTION,
+      articleSummary: rawText.slice(0, 150) || '원문 내용을 바탕으로 기획된 카드뉴스입니다.',
+      cards: simCards,
+      caption: `${rawText.slice(0, 120)}\n\n#카드뉴스 #홍시폰 #정보공유`,
     };
   }
 
-  // Call real Gemini API with gemini-3.8-flash and fallbacks
+  // Call real Gemini API with gemini-2.0-flash and candidate models
   try {
     const prompt = `
 당신은 인스타그램 카드뉴스 및 바이럴 콘텐츠 전문 AI 에디터입니다.
@@ -240,42 +222,72 @@ ${rawText}
       },
     });
 
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    const parsed = JSON.parse(text);
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+    let cleanJson = text.trim();
+    if (cleanJson.startsWith('```json')) {
+      cleanJson = cleanJson.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+    } else if (cleanJson.startsWith('```')) {
+      cleanJson = cleanJson.replace(/^```\s*/, '').replace(/\s*```$/, '');
+    }
+    const parsed = JSON.parse(cleanJson);
 
-    const generatedCards: CardItem[] = (parsed.cards || []).map((c: any, idx: number) => ({
-      cardId: idx + 1,
-      role: c.role || (idx === 0 ? '표지' : '본문'),
-      titleText: c.titleText || `카드 ${idx + 1}\\n[핵심 내용]`,
-      photo: {
-        hasPhoto: idx === 0,
-        url: idx === 0 ? DEMO_GAMING_CHAIR_IMAGE : '',
-        promptMode: 'auto',
-        styleHint: '',
-        scale: 100,
-        offsetX: 0,
-        offsetY: 0,
-        isGrayscale: false,
-      },
-      typography: {
-        fontSizePx: 26,
-        align: 'left',
-        fontWeight: 'extra-bold',
-        lineHeightPercent: 134,
-        letterSpacingPercent: -2,
-        baseColorHex: '#FFFFFF',
-        accentColorHex: '#1CF28D',
-        strokeWidthPx: 0,
-      },
-      gradient: {
-        enabled: true,
-        heightPercent: 55,
-        opacity: 0.9,
-      },
-    }));
+    // Build cards: Use user's uploaded reference image for Card 1!
+    // If no uploaded image, dynamically generate an AI image matching the actual title!
+    const generatedCards: CardItem[] = await Promise.all(
+      (parsed.cards || []).map(async (c: any, idx: number) => {
+        let cardPhotoUrl = '';
+        let hasPhoto = false;
+
+        if (idx === 0 && referenceImageUrl) {
+          // 1. 사용자가 직접 올린 원본 이미지를 표지(Card 1)에 1순위로 즉시 적용
+          cardPhotoUrl = referenceImageUrl;
+          hasPhoto = true;
+        } else if (idx === 0 && !referenceImageUrl) {
+          // 2. 사용자가 사진을 올리지 않은 경우, AI가 제목에 맞는 이미지를 실시간 생성
+          try {
+            const cleanTitle = (c.titleText || parsed.projectTitle || 'card news background').replace(/\[|\]|\n/g, ' ');
+            cardPhotoUrl = await generateCardImageAI(cleanTitle);
+            hasPhoto = true;
+          } catch {
+            hasPhoto = false;
+          }
+        }
+
+        return {
+          cardId: idx + 1,
+          role: c.role || (idx === 0 ? '표지' : '본문'),
+          titleText: c.titleText || `카드 ${idx + 1}\\n[핵심 내용]`,
+          photo: {
+            hasPhoto,
+            url: cardPhotoUrl,
+            promptMode: 'auto',
+            styleHint: '',
+            scale: 100,
+            offsetX: 0,
+            offsetY: 0,
+            isGrayscale: false,
+          },
+          typography: {
+            fontSizePx: 26,
+            align: 'left',
+            fontWeight: 'extra-bold',
+            lineHeightPercent: 134,
+            letterSpacingPercent: -2,
+            baseColorHex: '#FFFFFF',
+            accentColorHex: '#1CF28D',
+            strokeWidthPx: 0,
+          },
+          gradient: {
+            enabled: true,
+            heightPercent: 55,
+            opacity: 0.9,
+          },
+        };
+      })
+    );
 
     return {
-      projectTitle: parsed.projectTitle || 'AI 생성 카드뉴스',
+      projectTitle: parsed.projectTitle || userFallbackTitle.replace(/\[|\]|\n/g, ' ').slice(0, 20),
       recommendedTitles: (parsed.recommendedTitles || []).map((t: any, i: number) => ({
         id: `rec_${i + 1}`,
         rawTitle: t.rawTitle,
@@ -285,11 +297,11 @@ ${rawText}
         isSelected: i === 0,
       })),
       articleSummary: parsed.articleSummary || '',
-      cards: generatedCards.length > 0 ? generatedCards : DEFAULT_RECOMMENDED_TITLES as any,
+      cards: generatedCards.length > 0 ? generatedCards : [],
       caption: parsed.caption || DEFAULT_CAPTION,
     };
   } catch (err) {
-    console.error('Failed to call Gemini API, falling back to simulation:', err);
+    console.error('Failed to call Gemini API:', err);
     throw err;
   }
 }

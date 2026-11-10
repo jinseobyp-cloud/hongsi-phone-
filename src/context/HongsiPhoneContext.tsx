@@ -16,8 +16,6 @@ import {
   DEFAULT_RECOMMENDED_TITLES,
   DEFAULT_SUMMARY,
   DEFAULT_CAPTION,
-  DEMO_GAMING_CHAIR_IMAGE,
-  BACKUP_CHAIR_IMAGE,
   generateInitialCards,
   generateBlankCards,
 } from '../services/mockAiService';
@@ -356,7 +354,8 @@ export const HongsiPhoneProvider: React.FC<{ children: React.ReactNode }> = ({ c
         state.apiKey,
         textToAnalyze,
         state.sourceInput.targetCardCount,
-        state.sourceInput.guideline
+        state.sourceInput.guideline,
+        state.sourceInput.referenceImageUrl
       );
 
       setTimeout(() => {
@@ -372,6 +371,7 @@ export const HongsiPhoneProvider: React.FC<{ children: React.ReactNode }> = ({ c
             captionText: aiResult.caption,
           },
           activeCardIndex: 0,
+          activeMainTab: 'card',
           isSaved: false,
         }));
       }, stepInterval * 4);
@@ -379,14 +379,63 @@ export const HongsiPhoneProvider: React.FC<{ children: React.ReactNode }> = ({ c
       console.warn('AI analysis failed, using fallback:', e);
       setTimeout(() => {
         setIsAnalyzingModalOpen(false);
-        const newCards = generateInitialCards(state.sourceInput.targetCardCount);
+        const raw = state.sourceInput.rawText || '';
+        const lines = raw.split('\n').map((l) => l.trim()).filter((l) => l.length > 0);
+        const fallbackTitle = lines[0] || '스마트폰 카드뉴스\n[핵심 내용]';
+        const targetCount = Math.max(1, state.sourceInput.targetCardCount || 2);
+
+        const fallbackCards: CardItem[] = Array.from({ length: targetCount }, (_, idx) => ({
+          cardId: idx + 1,
+          role: idx === 0 ? '표지' : '본문',
+          titleText: idx === 0 ? fallbackTitle : (lines[idx] || `카드 ${idx + 1} 본문\n[상세 내용]`),
+          photo: {
+            hasPhoto: idx === 0 && !!state.sourceInput.referenceImageUrl,
+            url: (idx === 0 && state.sourceInput.referenceImageUrl) ? state.sourceInput.referenceImageUrl : '',
+            promptMode: 'auto',
+            styleHint: '',
+            scale: 100,
+            offsetX: 0,
+            offsetY: 0,
+            isGrayscale: false,
+          },
+          typography: {
+            fontSizePx: 26,
+            align: 'left',
+            fontWeight: 'extra-bold',
+            lineHeightPercent: 134,
+            letterSpacingPercent: -2,
+            baseColorHex: '#FFFFFF',
+            accentColorHex: '#1CF28D',
+            strokeWidthPx: 0,
+          },
+          gradient: {
+            enabled: true,
+            heightPercent: 55,
+            opacity: 0.9,
+          },
+        }));
+
         setState((prev) => ({
           ...prev,
-          projectTitle: '우주하마 엉덩이 건강',
-          cards: newCards,
+          projectTitle: fallbackTitle.replace(/\[|\]|\n/g, ' ').slice(0, 20),
+          cards: fallbackCards,
           activeCardIndex: 0,
-          aiRecommendedTitles: DEFAULT_RECOMMENDED_TITLES,
-          articleSummary: DEFAULT_SUMMARY,
+          activeMainTab: 'card',
+          aiRecommendedTitles: [
+            {
+              id: 'rec_1',
+              rawTitle: fallbackTitle,
+              displayWithNewlineSymbol: fallbackTitle.replace('\n', '\\n'),
+              score: '9.8/10',
+              reason: '입력된 원문의 핵심 메시지를 직접 반영',
+              isSelected: true,
+            },
+          ],
+          articleSummary: raw.slice(0, 150) || '원문 내용을 바탕으로 기획된 카드뉴스입니다.',
+          exportAndTranslate: {
+            ...prev.exportAndTranslate,
+            captionText: `${raw.slice(0, 120)}\n\n#카드뉴스 #홍시폰 #정보공유`,
+          },
           isSaved: false,
         }));
       }, stepInterval * 4);
@@ -430,17 +479,17 @@ export const HongsiPhoneProvider: React.FC<{ children: React.ReactNode }> = ({ c
     setTimeout(() => setImageGeneratingStep(2), stepInterval * 2);
 
     const activeCard = state.cards[targetIdx];
-    let newImageUrl = DEMO_GAMING_CHAIR_IMAGE;
+    let newImageUrl = '';
 
-    if (state.apiKey) {
+    if (targetIdx === 0 && state.sourceInput.referenceImageUrl && activeCard?.photo.promptMode !== 'custom') {
+      newImageUrl = state.sourceInput.referenceImageUrl;
+    } else {
+      const cleanTitle = activeCard?.titleText?.replace(/\[|\]|\n/g, ' ') || state.projectTitle || 'clean background';
       try {
-        const cleanTitle = activeCard?.titleText.replace(/\[|\]|\n/g, ' ') || 'card news background';
         newImageUrl = await generateCardImageAI(cleanTitle, activeCard?.photo.styleHint || '');
       } catch (err) {
-        newImageUrl = activeCard?.photo.url === DEMO_GAMING_CHAIR_IMAGE ? BACKUP_CHAIR_IMAGE : DEMO_GAMING_CHAIR_IMAGE;
+        newImageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(cleanTitle + ' aesthetic clean photography')}?width=1080&height=1350&nologo=true`;
       }
-    } else {
-      newImageUrl = activeCard?.photo.url === DEMO_GAMING_CHAIR_IMAGE ? BACKUP_CHAIR_IMAGE : DEMO_GAMING_CHAIR_IMAGE;
     }
 
     setTimeout(() => {
@@ -474,23 +523,49 @@ export const HongsiPhoneProvider: React.FC<{ children: React.ReactNode }> = ({ c
     setTimeout(() => setImageGeneratingStep(1), stepInterval);
     setTimeout(() => setImageGeneratingStep(2), stepInterval * 2);
 
+    const updatedCards = await Promise.all(
+      state.cards.map(async (card, idx) => {
+        if (idx === 0 && state.sourceInput.referenceImageUrl) {
+          return {
+            ...card,
+            photo: {
+              ...card.photo,
+              hasPhoto: true,
+              url: state.sourceInput.referenceImageUrl,
+            },
+          };
+        }
+        const cleanTitle = card.titleText?.replace(/\[|\]|\n/g, ' ') || `카드 ${idx + 1} 배경`;
+        try {
+          const generatedUrl = await generateCardImageAI(cleanTitle, card.photo.styleHint || '');
+          return {
+            ...card,
+            photo: {
+              ...card.photo,
+              hasPhoto: true,
+              url: generatedUrl,
+            },
+          };
+        } catch {
+          return {
+            ...card,
+            photo: {
+              ...card.photo,
+              hasPhoto: true,
+              url: `https://image.pollinations.ai/prompt/${encodeURIComponent(cleanTitle + ' clean aesthetic background')}?width=1080&height=1350&nologo=true&seed=${idx + 10}`,
+            },
+          };
+        }
+      })
+    );
+
     setTimeout(() => {
       setIsImageGeneratingModalOpen(false);
-      setState((prev) => {
-        const updatedCards = prev.cards.map((card, idx) => ({
-          ...card,
-          photo: {
-            ...card.photo,
-            hasPhoto: true,
-            url: idx % 2 === 0 ? DEMO_GAMING_CHAIR_IMAGE : BACKUP_CHAIR_IMAGE,
-          },
-        }));
-        return {
-          ...prev,
-          cards: updatedCards,
-          isSaved: false,
-        };
-      });
+      setState((prev) => ({
+        ...prev,
+        cards: updatedCards,
+        isSaved: false,
+      }));
     }, stepInterval * 3);
   };
 
