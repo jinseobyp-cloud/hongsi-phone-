@@ -20,7 +20,7 @@ import {
   generateBlankCards,
 } from '../services/mockAiService';
 import { exportCardsAsZip } from '../utils/exportZip';
-import { analyzeContentWithAI, generateCardImageAI, formatFallbackTitle } from '../services/geminiService';
+import { analyzeContentWithAI, generateCardImageAI, formatFallbackTitle, removeTextFromImageWithAI } from '../services/geminiService';
 import {
   fetchServerAuthInfo,
   verifyPasswordMatch,
@@ -73,6 +73,7 @@ interface HongsiPhoneContextType {
   updateCardPhoto: (patch: Partial<CardPhoto>) => void;
   updateCardGradient: (patch: Partial<CardGradient>) => void;
   removeCardPhoto: (index: number) => void;
+  removeTextFromCardPhoto: (cardIndex?: number) => Promise<void>;
   saveProject: () => void;
   toggleCropMode: () => void;
   toggleDarkMode: () => void;
@@ -397,8 +398,8 @@ export const HongsiPhoneProvider: React.FC<{ children: React.ReactNode }> = ({ c
       if (state.sourceInput.referenceImageUrl) {
         card1Url = state.sourceInput.referenceImageUrl;
         hasCard1Photo = true;
-        card1Scale = 135;
-        card1OffsetY = 20;
+        card1Scale = 100;
+        card1OffsetY = 0;
       } else {
         const topicKeyword = lines[0]?.slice(0, 35) || 'clean background';
         card1Url = `https://image.pollinations.ai/prompt/${encodeURIComponent(topicKeyword + ' clean background photography 8k')}?width=1080&height=1350&nologo=true`;
@@ -795,6 +796,70 @@ export const HongsiPhoneProvider: React.FC<{ children: React.ReactNode }> = ({ c
     });
   };
 
+  const removeTextFromCardPhoto = async (cardIndex?: number) => {
+    const targetIdx = cardIndex !== undefined ? cardIndex : state.activeCardIndex;
+    const activeCard = state.cards[targetIdx];
+    if (!activeCard || !activeCard.photo.url) {
+      alert('글씨를 지울 사진이 없습니다.');
+      return;
+    }
+
+    const activeApiKey =
+      state.apiKey ||
+      (typeof window !== 'undefined' ? localStorage.getItem('hongsiphone_gemini_api_key') || '' : '');
+
+    if (!activeApiKey) {
+      alert('AI 글씨 지우기 기능을 사용하려면 상단 [🔑 API 키] 메뉴에서 Gemini API 키를 입력해 주세요.\n(또는 제미나이 웹에서 글씨가 제거된 사진을 [사진 변경]으로 업로드하셔도 100% 원본 비율로 깔끔하게 적용됩니다!)');
+      return;
+    }
+
+    setIsImageGeneratingModalOpen(true);
+    setImageGeneratingStep(1);
+
+    try {
+      let base64Data = activeCard.photo.url;
+      if (!base64Data.startsWith('data:')) {
+        const resp = await fetch(base64Data);
+        const blob = await resp.blob();
+        base64Data = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+      }
+
+      const cleanPhotoUrl = await removeTextFromImageWithAI(activeApiKey, base64Data);
+
+      setState((prev) => {
+        const updatedCards = [...prev.cards];
+        if (updatedCards[targetIdx]) {
+          updatedCards[targetIdx] = {
+            ...updatedCards[targetIdx],
+            photo: {
+              ...updatedCards[targetIdx].photo,
+              hasPhoto: true,
+              url: cleanPhotoUrl,
+              scale: 100,
+              offsetY: 0,
+            },
+          };
+        }
+        return {
+          ...prev,
+          cards: updatedCards,
+          isSaved: false,
+        };
+      });
+      alert('✨ 사진 속 자막/글씨가 깨끗하게 지워졌습니다!');
+    } catch (err: any) {
+      console.error('removeTextFromImageWithAI error:', err);
+      alert(`AI 글씨 지우기 안내: ${err.message || 'Gemini 모델 응답을 확인해 주세요.'}\n\n💡 팁: 제미나이 웹(gemini.google.com)에서 자막을 지운 사진을 [사진 변경]으로 업로드하시면 원본 100% 비율로 왜곡 없이 바로 적용됩니다.`);
+    } finally {
+      setIsImageGeneratingModalOpen(false);
+    }
+  };
+
   const saveProject = () => {
     setState((prev) => ({ ...prev, isSaved: true }));
   };
@@ -981,6 +1046,7 @@ export const HongsiPhoneProvider: React.FC<{ children: React.ReactNode }> = ({ c
         updateCardPhoto,
         updateCardGradient,
         removeCardPhoto,
+        removeTextFromCardPhoto,
         saveProject,
         toggleCropMode,
         toggleDarkMode,

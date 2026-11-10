@@ -8,6 +8,7 @@ export const Module4_CardTab: React.FC = () => {
     runGenerateImage,
     runGenerateAllImages,
     updateCardPhoto,
+    removeTextFromCardPhoto,
   } = useHongsiPhone();
 
   const [isImageAccordionOpen, setIsImageAccordionOpen] = useState(true);
@@ -57,14 +58,38 @@ export const Module4_CardTab: React.FC = () => {
 
             {/* Photo Adjust & Subtitle Crop Controls */}
             {(activeCard?.photo.hasPhoto && (activeCard?.photo.originalUploadUrl || state.sourceInput.referenceImageUrl || activeCard?.photo.url)) && (
-              <div className="p-3 rounded-2xl bg-[#FFF9F5] dark:bg-orange-950/30 border border-orange-200 dark:border-orange-900/60 space-y-2">
+              <div className="p-3 rounded-2xl bg-[#FFF9F5] dark:bg-orange-950/30 border border-orange-200 dark:border-orange-900/60 space-y-2.5">
                 <div className="flex items-center justify-between text-xs font-bold text-orange-950 dark:text-orange-200">
-                  <span>사진 글씨 가리기 / 위치 조절</span>
+                  <span>사진 글씨 제거 & 비율 조절</span>
                   <span className="text-[10px] text-orange-600 dark:text-orange-400 font-semibold">
-                    {activeCard?.photo.scale}% 확대 · 세로 {activeCard?.photo.offsetY}px
+                    {activeCard?.photo.scale}% 비율 · {activeCard?.photo.offsetY === 0 ? '원형 유지' : `위치 ${activeCard?.photo.offsetY}px`}
                   </span>
                 </div>
+
+                {/* AI Text Removal Action */}
+                <button
+                  type="button"
+                  onClick={() => removeTextFromCardPhoto()}
+                  className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-extrabold text-xs shadow-sm flex items-center justify-center space-x-1.5 transition active:scale-[0.98]"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-yellow-300" />
+                  <span>🪄 사진 속 자막/글씨 AI로 지우기</span>
+                </button>
+
                 <div className="grid grid-cols-2 gap-2 text-xs font-bold">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      updateCardPhoto({ scale: 100, offsetY: 0, offsetX: 0 });
+                    }}
+                    className={`py-2 px-2 rounded-xl border text-center transition flex items-center justify-center space-x-1 ${
+                      activeCard?.photo.scale === 100 && activeCard?.photo.offsetY === 0
+                        ? 'border-orange-500 bg-orange-100 dark:bg-orange-950/60 text-orange-950 dark:text-orange-200 shadow-xs font-black'
+                        : 'border-slate-200 bg-white dark:bg-slate-800 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span>🔄 원본 비율 (100%)</span>
+                  </button>
                   <button
                     type="button"
                     onClick={() => {
@@ -78,20 +103,11 @@ export const Module4_CardTab: React.FC = () => {
                   >
                     <span>✂️ 하단 글씨 가리기 (확대)</span>
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      updateCardPhoto({ scale: 100, offsetY: 0, offsetX: 0 });
-                    }}
-                    className={`py-2 px-2 rounded-xl border text-center transition flex items-center justify-center space-x-1 ${
-                      activeCard?.photo.scale === 100 && activeCard?.photo.offsetY === 0
-                        ? 'border-orange-500 bg-orange-100 dark:bg-orange-950/60 text-orange-950 dark:text-orange-200 shadow-xs'
-                        : 'border-slate-200 bg-white dark:bg-slate-800 text-slate-600 hover:bg-slate-50'
-                    }`}
-                  >
-                    <span>🔄 원본 비율 (100%)</span>
-                  </button>
                 </div>
+
+                <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
+                  💡 제미나이 웹(gemini.google.com)에서 자막을 지운 사진을 [원문] 탭에서 업로드하시면 100% 원본 비율로 왜곡 없이 바로 적용됩니다.
+                </p>
               </div>
             )}
 

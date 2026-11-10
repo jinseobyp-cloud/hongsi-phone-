@@ -141,12 +141,11 @@ export async function analyzeContentWithAI(
     let card1OffsetY = 0;
 
     if (referenceImageUrl) {
-      // 사용자가 직접 올린 원본 사진을 100% 그대로 적용
-      // 하단 자막/글씨는 가려지고 인물(피사체)이 중앙에 오도록 스마트 확대(scale: 135) 및 위치(offsetY: 20) 기본 적용
+      // 사용자가 직접 올린 원본 사진을 100% 원형 그대로 보존 적용 (강제 확대 왜곡 제거)
       card1Url = referenceImageUrl;
       hasCard1Photo = true;
-      card1Scale = 135;
-      card1OffsetY = 20;
+      card1Scale = 100;
+      card1OffsetY = 0;
     } else {
       // 사진이 없을 때만 키워드 배경 이미지 생성
       const topicKeyword = cleanLines[0]?.slice(0, 35) || 'clean background';
@@ -301,12 +300,11 @@ ${rawText}
 
         if (idx === 0) {
           if (referenceImageUrl) {
-            // 사용자가 올린 실제 사진(워런 버핏 등)을 최우선 적용
-            // 하단 자막/글씨는 가리고 인물이 화면 중앙에 오도록 스마트 확대(135%) 및 세로 오프셋(20px) 기본 적용
+            // 사용자가 올린 실제 사진(워런 버핏 등)을 100% 원형 그대로 보존 적용
             cardPhotoUrl = referenceImageUrl;
             hasPhoto = true;
-            cardScale = 135;
-            cardOffsetY = 20;
+            cardScale = 100;
+            cardOffsetY = 0;
           } else {
             try {
               const cleanPrompt = parsed.coverImagePrompt || (c.titleText || parsed.projectTitle || 'clean photograph').replace(/\[|\]|\n/g, ' ');
@@ -388,4 +386,73 @@ export async function generateCardImageAI(
   return `https://image.pollinations.ai/prompt/${query}?width=1080&height=1350&nologo=true&seed=${Math.floor(
     Math.random() * 1000000
   )}`;
+}
+
+/**
+ * Removes text/subtitles/watermarks from an image using Gemini / Inpainting API
+ */
+export async function removeTextFromImageWithAI(
+  apiKey: string,
+  imageBase64: string
+): Promise<string> {
+  const match = imageBase64.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/);
+  if (!match) throw new Error('유효한 이미지 데이터가 아닙니다.');
+
+  const mimeType = match[1];
+  const data = match[2];
+
+  const candidateModels = [
+    'gemini-2.0-flash-exp',
+    'gemini-2.5-flash-image',
+    'gemini-2.0-flash',
+  ];
+
+  for (const model of candidateModels) {
+    try {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  {
+                    text: 'Please remove all text, subtitles, watermarks, captions, and words from this image completely. Perfectly reconstruct the background and subject behind the text in high resolution.',
+                  },
+                  {
+                    inline_data: {
+                      mime_type: mimeType,
+                      data: data,
+                    },
+                  },
+                ],
+              },
+            ],
+            generationConfig: {
+              responseModalities: ['IMAGE'],
+            },
+          }),
+        }
+      );
+
+      if (response.ok) {
+        const result = await response.json();
+        const parts = result.candidates?.[0]?.content?.parts || [];
+        for (const part of parts) {
+          if (part.inlineData?.data) {
+            return `data:${part.inlineData.mimeType || 'image/jpeg'};base64,${part.inlineData.data}`;
+          }
+          if (part.inline_data?.data) {
+            return `data:${part.inline_data.mime_type || 'image/jpeg'};base64,${part.inline_data.data}`;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn(`Model ${model} inpainting error:`, e);
+    }
+  }
+
+  throw new Error('AI 글씨 제거를 처리할 수 없습니다. 제미나이 웹에서 생성된 깨끗한 사진을 업로드해 보세요.');
 }
