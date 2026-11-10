@@ -20,7 +20,7 @@ import {
   generateBlankCards,
 } from '../services/mockAiService';
 import { exportCardsAsZip } from '../utils/exportZip';
-import { analyzeContentWithAI, generateCardImageAI } from '../services/geminiService';
+import { analyzeContentWithAI, generateCardImageAI, formatFallbackTitle } from '../services/geminiService';
 import {
   fetchServerAuthInfo,
   verifyPasswordMatch,
@@ -339,10 +339,14 @@ export const HongsiPhoneProvider: React.FC<{ children: React.ReactNode }> = ({ c
     setIsAnalyzingModalOpen(true);
     setAnalyzingStep(0);
 
-    const stepInterval = 600;
+    const stepInterval = 500;
     setTimeout(() => setAnalyzingStep(1), stepInterval);
     setTimeout(() => setAnalyzingStep(2), stepInterval * 2);
     setTimeout(() => setAnalyzingStep(3), stepInterval * 3);
+
+    const activeApiKey =
+      state.apiKey ||
+      (typeof window !== 'undefined' ? localStorage.getItem('hongsiphone_gemini_api_key') || '' : '');
 
     try {
       const textToAnalyze =
@@ -351,17 +355,19 @@ export const HongsiPhoneProvider: React.FC<{ children: React.ReactNode }> = ({ c
           : state.sourceInput.rawText;
 
       const aiResult = await analyzeContentWithAI(
-        state.apiKey,
+        activeApiKey,
         textToAnalyze,
         state.sourceInput.targetCardCount,
         state.sourceInput.guideline,
         state.sourceInput.referenceImageUrl
       );
 
+      // Brief animation completion then immediately switch to card tab
       setTimeout(() => {
         setIsAnalyzingModalOpen(false);
         setState((prev) => ({
           ...prev,
+          apiKey: activeApiKey || prev.apiKey,
           projectTitle: aiResult.projectTitle,
           cards: aiResult.cards,
           aiRecommendedTitles: aiResult.recommendedTitles,
@@ -374,71 +380,87 @@ export const HongsiPhoneProvider: React.FC<{ children: React.ReactNode }> = ({ c
           activeMainTab: 'card',
           isSaved: false,
         }));
-      }, stepInterval * 4);
+      }, 300);
     } catch (e) {
       console.warn('AI analysis failed, using fallback:', e);
-      setTimeout(() => {
-        setIsAnalyzingModalOpen(false);
-        const raw = state.sourceInput.rawText || '';
-        const lines = raw.split('\n').map((l) => l.trim()).filter((l) => l.length > 0);
-        const fallbackTitle = lines[0] || '스마트폰 카드뉴스\n[핵심 내용]';
-        const targetCount = Math.max(1, state.sourceInput.targetCardCount || 2);
+      setIsAnalyzingModalOpen(false);
+      const raw = state.sourceInput.rawText || '';
+      const lines = raw.split('\n').map((l) => l.trim()).filter((l) => l.length > 0);
+      const fallbackTitle = formatFallbackTitle(lines[0] || '스마트폰 카드뉴스', '핵심 내용');
+      const targetCount = Math.max(1, state.sourceInput.targetCardCount || 2);
 
-        const fallbackCards: CardItem[] = Array.from({ length: targetCount }, (_, idx) => ({
-          cardId: idx + 1,
-          role: idx === 0 ? '표지' : '본문',
-          titleText: idx === 0 ? fallbackTitle : (lines[idx] || `카드 ${idx + 1} 본문\n[상세 내용]`),
-          photo: {
-            hasPhoto: idx === 0 && !!state.sourceInput.referenceImageUrl,
-            url: (idx === 0 && state.sourceInput.referenceImageUrl) ? state.sourceInput.referenceImageUrl : '',
-            promptMode: 'auto',
-            styleHint: '',
-            scale: 100,
-            offsetX: 0,
-            offsetY: 0,
-            isGrayscale: false,
-          },
-          typography: {
-            fontSizePx: 26,
-            align: 'left',
-            fontWeight: 'extra-bold',
-            lineHeightPercent: 134,
-            letterSpacingPercent: -2,
-            baseColorHex: '#FFFFFF',
-            accentColorHex: '#1CF28D',
-            strokeWidthPx: 0,
-          },
-          gradient: {
-            enabled: true,
-            heightPercent: 55,
-            opacity: 0.9,
-          },
-        }));
+      let card1Url = '';
+      let hasCard1Photo = false;
+      if (state.sourceInput.referenceImageUrl) {
+        card1Url = state.sourceInput.referenceImageUrl;
+        hasCard1Photo = true;
+      } else {
+        const topicKeyword = lines[0]?.slice(0, 20) || 'card news background';
+        card1Url = `https://image.pollinations.ai/prompt/${encodeURIComponent(topicKeyword + ' clean photography')}?width=1080&height=1350&nologo=true`;
+        hasCard1Photo = true;
+      }
 
-        setState((prev) => ({
-          ...prev,
-          projectTitle: fallbackTitle.replace(/\[|\]|\n/g, ' ').slice(0, 20),
-          cards: fallbackCards,
-          activeCardIndex: 0,
-          activeMainTab: 'card',
-          aiRecommendedTitles: [
-            {
-              id: 'rec_1',
-              rawTitle: fallbackTitle,
-              displayWithNewlineSymbol: fallbackTitle.replace('\n', '\\n'),
-              score: '9.8/10',
-              reason: '입력된 원문의 핵심 메시지를 직접 반영',
-              isSelected: true,
-            },
-          ],
-          articleSummary: raw.slice(0, 150) || '원문 내용을 바탕으로 기획된 카드뉴스입니다.',
-          exportAndTranslate: {
-            ...prev.exportAndTranslate,
-            captionText: `${raw.slice(0, 120)}\n\n#카드뉴스 #홍시폰 #정보공유`,
-          },
-          isSaved: false,
-        }));
-      }, stepInterval * 4);
+      const fallbackCards: CardItem[] = Array.from({ length: targetCount }, (_, idx) => ({
+        cardId: idx + 1,
+        role: idx === 0 ? '표지' : '본문',
+        titleText: idx === 0 ? fallbackTitle : formatFallbackTitle(lines[idx] || `카드 ${idx + 1} 상세 안내`, `핵심 포인트 ${idx + 1}`),
+        photo: {
+          hasPhoto: idx === 0 ? hasCard1Photo : false,
+          url: idx === 0 ? card1Url : '',
+          promptMode: 'auto',
+          styleHint: '',
+          scale: 100,
+          offsetX: 0,
+          offsetY: 0,
+          isGrayscale: false,
+        },
+        typography: {
+          fontSizePx: 26,
+          align: 'left',
+          fontWeight: 'extra-bold',
+          lineHeightPercent: 134,
+          letterSpacingPercent: -2,
+          baseColorHex: '#FFFFFF',
+          accentColorHex: '#1CF28D',
+          strokeWidthPx: 0,
+        },
+        gradient: {
+          enabled: true,
+          heightPercent: 55,
+          opacity: 0.9,
+        },
+      }));
+
+      const titlesList = [
+        formatFallbackTitle(lines[0] || '스마트폰 카드뉴스', '핵심 비결'),
+        formatFallbackTitle(lines[1] || lines[0] || '주목할 만한 이야기', '화제의 이유'),
+        formatFallbackTitle(lines[2] || lines[0] || '놓치면 아쉬운 정보', '상세 분석'),
+        formatFallbackTitle(lines[3] || lines[0] || '이것만 알면 끝', '반전 결말'),
+        formatFallbackTitle(lines[4] || lines[0] || '핵심 요약 정리', '최종 정리'),
+      ];
+
+      setState((prev) => ({
+        ...prev,
+        apiKey: activeApiKey || prev.apiKey,
+        projectTitle: fallbackTitle.replace(/\[|\]|\n/g, ' ').slice(0, 20),
+        cards: fallbackCards,
+        activeCardIndex: 0,
+        activeMainTab: 'card',
+        aiRecommendedTitles: titlesList.map((t, i) => ({
+          id: `rec_${i + 1}`,
+          rawTitle: t,
+          displayWithNewlineSymbol: t.replace('\n', '\\n'),
+          score: `${(9.8 - i * 0.2).toFixed(1)}/10`,
+          reason: i === 0 ? '입력된 원문의 핵심 메시지를 직접 반영' : `원문 문맥 기반 추천 제목 ${i + 1}`,
+          isSelected: i === 0,
+        })),
+        articleSummary: raw.slice(0, 150) || '원문 내용을 바탕으로 기획된 카드뉴스입니다.',
+        exportAndTranslate: {
+          ...prev.exportAndTranslate,
+          captionText: `${raw.slice(0, 120)}\n\n#카드뉴스 #홍시폰 #정보공유`,
+        },
+        isSaved: false,
+      }));
     }
   };
 

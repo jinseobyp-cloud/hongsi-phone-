@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useHongsiPhone } from '../context/HongsiPhoneContext';
 import { Key, X, Check, Eye, EyeOff, ExternalLink, AlertCircle, Lock } from 'lucide-react';
@@ -17,12 +17,28 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose }) => 
   const [isTesting, setIsTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
 
+  useEffect(() => {
+    if (isOpen) {
+      const stored = typeof window !== 'undefined' ? (localStorage.getItem('hongsiphone_gemini_api_key') || state.apiKey || '') : state.apiKey;
+      setInputKey(stored);
+      setTestResult(null);
+    }
+  }, [isOpen, state.apiKey]);
+
   // Access Password change state (Admin only)
   const [adminKey, setAdminKey] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [passSaveResult, setPassSaveResult] = useState<{ success: boolean; message: string } | null>(null);
 
   if (!isOpen) return null;
+
+  const handleClose = () => {
+    if (inputKey.trim() && inputKey.trim() !== state.apiKey) {
+      setApiKey(inputKey.trim());
+      localStorage.setItem('hongsiphone_gemini_api_key', inputKey.trim());
+    }
+    onClose();
+  };
 
   const handleSave = () => {
     setApiKey(inputKey.trim());
@@ -59,6 +75,11 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose }) => 
     const result = await testGeminiApiKey(inputKey.trim());
     setTestResult(result);
     setIsTesting(false);
+
+    if (result.success) {
+      setApiKey(inputKey.trim());
+      localStorage.setItem('hongsiphone_gemini_api_key', inputKey.trim());
+    }
   };
 
   const modalContent = (
@@ -73,7 +94,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose }) => 
             <span>Gemini AI API 키 설정</span>
           </div>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="p-1.5 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition"
           >
             <X className="w-4 h-4" />
@@ -85,12 +106,12 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose }) => 
           {state.apiKey ? (
             <div className="flex items-center space-x-2 px-3 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-xs font-bold">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-              <span>실제 Gemini 3.8 Flash AI 활성화됨</span>
+              <span>실제 Gemini AI 활성화됨</span>
             </div>
           ) : (
             <div className="flex items-center space-x-2 px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs font-medium">
               <span className="w-2.5 h-2.5 rounded-full bg-slate-400 shrink-0" />
-              <span>시뮬레이션 모드 (유튜브 데모 데이터)</span>
+              <span>로컬 분석 모드 (입력한 원문과 사진으로 직접 생성)</span>
             </div>
           )}
         </div>

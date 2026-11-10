@@ -16,7 +16,6 @@ export interface AnalysisResult {
 
 const CANDIDATE_MODELS = [
   'gemini-2.0-flash',
-  'gemini-2.5-flash',
   'gemini-1.5-flash',
   'gemini-1.5-pro',
 ];
@@ -108,6 +107,22 @@ export async function testGeminiApiKey(apiKey: string): Promise<{ success: boole
  * Analyzes article text or URL using Gemini API if key is present,
  * or falls back to realistic mock demo data.
  */
+export function formatFallbackTitle(text: string, defaultHook: string = '핵심 내용'): string {
+  const clean = (text || '').replace(/\[|\]/g, '').trim();
+  if (!clean) return `스마트폰 카드뉴스\n[${defaultHook}]`;
+  if (clean.includes('\n')) {
+    const parts = clean.split('\n').map((p) => p.trim()).filter(Boolean);
+    if (parts.length >= 2) return `${parts[0]}\n[${parts[1]}]`;
+  }
+  if (clean.length <= 14) return `${clean}\n[${defaultHook}]`;
+  const mid = Math.min(18, Math.floor(clean.length / 2));
+  const space = clean.lastIndexOf(' ', mid);
+  const splitIdx = space > 6 ? space : mid;
+  const l1 = clean.slice(0, splitIdx).trim();
+  const l2 = clean.slice(splitIdx, splitIdx + 20).trim();
+  return `${l1}\n[${l2}]`;
+}
+
 export async function analyzeContentWithAI(
   apiKey: string | null,
   rawText: string,
@@ -116,17 +131,28 @@ export async function analyzeContentWithAI(
   referenceImageUrl: string | null = null
 ): Promise<AnalysisResult> {
   const cleanLines = (rawText || '').split('\n').map((l) => l.trim()).filter((l) => l.length > 0);
-  const userFallbackTitle = cleanLines[0] || '스마트폰 카드뉴스\n[핵심 내용]';
+  const userFallbackTitle = formatFallbackTitle(cleanLines[0] || '스마트폰 카드뉴스', '핵심 비결');
 
   if (!apiKey || !apiKey.trim()) {
     // Local simulation using user's actual text and uploaded image
+    let card1Url = '';
+    let hasCard1Photo = false;
+    if (referenceImageUrl) {
+      card1Url = referenceImageUrl;
+      hasCard1Photo = true;
+    } else {
+      const topicKeyword = cleanLines[0]?.slice(0, 20) || 'card news background';
+      card1Url = `https://image.pollinations.ai/prompt/${encodeURIComponent(topicKeyword + ' clean photography')}?width=1080&height=1350&nologo=true`;
+      hasCard1Photo = true;
+    }
+
     const simCards: CardItem[] = Array.from({ length: Math.max(1, targetCardCount) }, (_, idx) => ({
       cardId: idx + 1,
       role: idx === 0 ? '표지' : '본문',
-      titleText: idx === 0 ? userFallbackTitle : (cleanLines[idx] || `카드 ${idx + 1} 본문\n[상세 내용]`),
+      titleText: idx === 0 ? userFallbackTitle : formatFallbackTitle(cleanLines[idx] || `카드 ${idx + 1} 상세 안내`, `핵심 포인트 ${idx + 1}`),
       photo: {
-        hasPhoto: idx === 0 && !!referenceImageUrl,
-        url: (idx === 0 && referenceImageUrl) ? referenceImageUrl : '',
+        hasPhoto: idx === 0 ? hasCard1Photo : false,
+        url: idx === 0 ? card1Url : '',
         promptMode: 'auto',
         styleHint: '',
         scale: 100,
@@ -151,18 +177,24 @@ export async function analyzeContentWithAI(
       },
     }));
 
+    const titlesList = [
+      formatFallbackTitle(cleanLines[0] || '스마트폰 카드뉴스', '핵심 비결'),
+      formatFallbackTitle(cleanLines[1] || cleanLines[0] || '주목할 만한 이야기', '화제의 이유'),
+      formatFallbackTitle(cleanLines[2] || cleanLines[0] || '놓치면 아쉬운 정보', '상세 분석'),
+      formatFallbackTitle(cleanLines[3] || cleanLines[0] || '이것만 알면 끝', '반전 결말'),
+      formatFallbackTitle(cleanLines[4] || cleanLines[0] || '핵심 요약 정리', '최종 정리'),
+    ];
+
     return {
       projectTitle: userFallbackTitle.replace(/\[|\]|\n/g, ' ').slice(0, 20),
-      recommendedTitles: [
-        {
-          id: 'rec_1',
-          rawTitle: userFallbackTitle,
-          displayWithNewlineSymbol: userFallbackTitle.replace('\n', '\\n'),
-          score: '9.8/10',
-          reason: '입력된 원문의 핵심 메시지를 직접 반영',
-          isSelected: true,
-        },
-      ],
+      recommendedTitles: titlesList.map((t, i) => ({
+        id: `rec_${i + 1}`,
+        rawTitle: t,
+        displayWithNewlineSymbol: t.replace('\n', '\\n'),
+        score: `${(9.8 - i * 0.2).toFixed(1)}/10`,
+        reason: i === 0 ? '입력된 원문의 핵심 메시지를 직접 반영' : `원문 문맥 기반 추천 제목 ${i + 1}`,
+        isSelected: i === 0,
+      })),
       articleSummary: rawText.slice(0, 150) || '원문 내용을 바탕으로 기획된 카드뉴스입니다.',
       cards: simCards,
       caption: `${rawText.slice(0, 120)}\n\n#카드뉴스 #홍시폰 #정보공유`,

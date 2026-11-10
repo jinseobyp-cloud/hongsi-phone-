@@ -62,8 +62,8 @@ export const Module1_Header: React.FC = () => {
           <span className="font-extrabold text-lg tracking-tight text-slate-900 dark:text-white">
             홍시폰
           </span>
-          <span className="text-[11px] font-semibold text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">
-            V2.0
+          <span className="text-[11px] font-bold text-orange-600 dark:text-orange-400 bg-orange-100 dark:bg-orange-950/60 px-1.5 py-0.5 rounded-full">
+            V2.1
           </span>
         </div>
 
