@@ -114,13 +114,32 @@ export function formatFallbackTitle(text: string, defaultHook: string = '핵심 
     const parts = clean.split('\n').map((p) => p.trim()).filter(Boolean);
     if (parts.length >= 2) return `${parts[0]}\n[${parts[1]}]`;
   }
-  if (clean.length <= 14) return `${clean}\n[${defaultHook}]`;
-  const mid = Math.min(18, Math.floor(clean.length / 2));
-  const space = clean.lastIndexOf(' ', mid);
-  const splitIdx = space > 6 ? space : mid;
-  const l1 = clean.slice(0, splitIdx).trim();
-  const l2 = clean.slice(splitIdx, splitIdx + 20).trim();
-  return `${l1}\n[${l2}]`;
+  
+  // 20자 이하의 짧은 문장은 hook을 2번째 줄로 덧붙임
+  if (clean.length <= 20) return `${clean}\n[${defaultHook}]`;
+
+  // 단어 단위로 쪼개어 자연스러운 지점에서 2줄 분할 (글자가 도중에 잘리지 않음)
+  const words = clean.split(/\s+/);
+  let line1 = '';
+  let line2 = '';
+  
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i];
+    // 첫 줄이 대략 15~24자 정도 찼고 단어가 남아있으면 다음 줄로 넘김
+    if (!line2 && line1.length >= 15 && i < words.length - 1) {
+      line2 = word;
+    } else if (line2) {
+      line2 += ' ' + word;
+    } else {
+      line1 = line1 ? line1 + ' ' + word : word;
+    }
+  }
+
+  if (!line2) {
+    return `${line1}\n[${defaultHook}]`;
+  }
+
+  return `${line1}\n[${line2}]`;
 }
 
 export async function analyzeContentWithAI(
@@ -191,11 +210,11 @@ export async function analyzeContentWithAI(
     }));
 
     const titlesList = [
-      formatFallbackTitle(cleanLines[0] || '스마트폰 카드뉴스', '핵심 비결'),
-      formatFallbackTitle(cleanLines[1] || cleanLines[0] || '주목할 만한 이야기', '화제의 이유'),
-      formatFallbackTitle(cleanLines[2] || cleanLines[0] || '놓치면 아쉬운 정보', '상세 분석'),
-      formatFallbackTitle(cleanLines[3] || cleanLines[0] || '이것만 알면 끝', '반전 결말'),
-      formatFallbackTitle(cleanLines[4] || cleanLines[0] || '핵심 요약 정리', '최종 정리'),
+      formatFallbackTitle(cleanLines[0] || '스마트폰 카드뉴스', '충격적인 원인'),
+      formatFallbackTitle(cleanLines[1] || cleanLines[0] || '주목할 만한 이야기', '궁금증 자극 비결'),
+      formatFallbackTitle(cleanLines[2] || cleanLines[0] || '놓치면 아쉬운 정보', '상황의 심각성'),
+      formatFallbackTitle(cleanLines[3] || cleanLines[0] || '이것만 알면 끝', '지금 내 상태는?'),
+      formatFallbackTitle(cleanLines[4] || cleanLines[0] || '핵심 요약 정리', '반드시 알아야 할 정보'),
     ];
 
     return {

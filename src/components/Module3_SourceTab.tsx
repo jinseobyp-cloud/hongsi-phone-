@@ -501,7 +501,7 @@ export const Module3_SourceTab: React.FC = () => {
                         : 'border-[#EBE6DF] dark:border-slate-800 bg-[#F2ECE1]/60 dark:bg-slate-800/50 hover:border-[#D6CFBE]'
                       }`}
                   >
-                    <div className="text-xs font-extrabold text-[#2D241E] dark:text-white leading-relaxed mb-1 whitespace-pre-line">
+                    <div className="text-xs font-extrabold text-[#2D241E] dark:text-white leading-relaxed mb-1 whitespace-pre-line break-keep">
                       {item.rawTitle.replace(/\[|\]/g, '')}
                     </div>
                     <div className="text-[10px] leading-tight text-[#7A7167] dark:text-slate-400 flex items-start space-x-1">
