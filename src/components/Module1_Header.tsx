@@ -63,7 +63,7 @@ export const Module1_Header: React.FC = () => {
             홍시폰
           </span>
           <span className="text-[11px] font-bold text-orange-600 dark:text-orange-400 bg-orange-100 dark:bg-orange-950/60 px-1.5 py-0.5 rounded-full">
-            V2.8
+            V2.9
           </span>
         </div>
 

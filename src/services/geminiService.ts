@@ -130,7 +130,12 @@ export async function analyzeContentWithAI(
   guideline: string = '',
   referenceImageUrl: string | null = null
 ): Promise<AnalysisResult> {
-  const cleanLines = (rawText || '').split('\n').map((l) => l.trim()).filter((l) => l.length > 0);
+  // Strip URL-only lines from rawText so they don't appear as titles
+  const sanitizedText = (rawText || '')
+    .split('\n')
+    .filter((l) => !/^\s*(https?:\/\/|www\.)[^\s]+\s*$/.test(l))  // remove bare URL lines
+    .join('\n');
+  const cleanLines = sanitizedText.split('\n').map((l) => l.trim()).filter((l) => l.length > 0);
   const userFallbackTitle = formatFallbackTitle(cleanLines[0] || '스마트폰 카드뉴스', '핵심 비결');
 
   if (!apiKey || !apiKey.trim()) {
@@ -200,12 +205,12 @@ export async function analyzeContentWithAI(
         rawTitle: t,
         displayWithNewlineSymbol: t.replace('\n', '\\n'),
         score: `${(9.8 - i * 0.2).toFixed(1)}/10`,
-        reason: i === 0 ? '입력된 원문의 핵심 메시지를 직접 반영' : `원문 문맥 기반 추천 제목 ${i + 1}`,
+        reason: ['충격적 사실 + 원인 궁금증 유발', '썸네일 키워드 결합 + 호기심 자극', '인용구/상황 묘사 + 공감 유도', '내면·외형 변화 언급 + 자가 점검 유도', '타겟 독자 명확화 + 유익성 강조'][i] || `추천 제목 ${i + 1}`,
         isSelected: i === 0,
       })),
-      articleSummary: rawText.slice(0, 150) || '원문 내용을 바탕으로 기획된 카드뉴스입니다.',
+      articleSummary: sanitizedText.slice(0, 150) || '원문 내용을 바탕으로 기획된 카드뉴스입니다.',
       cards: simCards,
-      caption: `${rawText.slice(0, 120)}\n\n#카드뉴스 #홍시폰 #정보공유`,
+      caption: `${sanitizedText.slice(0, 120)}\n\n#카드뉴스 #홍시폰 #정보공유`,
     };
   }
 
@@ -215,23 +220,29 @@ export async function analyzeContentWithAI(
 당신은 인스타그램 카드뉴스 및 바이럴 콘텐츠 전문 AI 에디터입니다.
 다음 원문 기사/글을 바탕으로 카드뉴스를 기획해 주세요. 첨부된 이미지가 있다면 이미지 속 피사체와 분위기를 분석하세요.
 
+[필수 언어 규칙]
+- 모든 추천 제목(rawTitle), projectTitle, articleSummary, caption은 반드시 한국어로 작성하세요.
+- 원문이 영어, 일본어 등 외국어인 경우에도 한국어로 번역하여 제목을 생성하세요.
+- 제목에 URL, 링크 주소, 해시태그를 절대 넣지 마세요.
+
 [지침]
 ${guideline || '제목에 숫자를 넣어주세요 / 본문은 존댓말로 / 인용문은 있는 그대로 살려주세요'}
 
 [원문]
-${rawText}
+${sanitizedText}
 
 [요청 사항]
 1. 3어절 내외의 프로젝트 핵심 주제어(projectTitle)
 2. 가장 바이럴 가능성이 높은 AI 추천 제목 5개:
    - 각 제목은 2줄로 줄바꿈(\\n)을 포함해야 하며, 가장 핵심이 되는 강조 단어/구절은 반드시 [대괄호]로 감싸야 합니다. 예: "220만 유튜버 우주하마\\n[방송 중단하게 만든 질병]"
    - 10점 만점 바이럴 점수(score, 예: "9.5/10")와 선정 이유(reason) 포함
-   - 아래 카드별 공식을 반드시 따르세요:
-     * 제목1(카드1): 본문에서 충격적인 내용을 통해 클릭을 유도하고, 그 원인에 대한 궁금증을 자극하는 제목. reason: "충격적 사실 + 원인 궁금증 유발"
-     * 제목2(카드2): 원본 썸네일에 등장한 키워드들을 결합하여 호기심을 유발하는 제목. reason: "썸네일 키워드 결합 + 호기심 자극"
-     * 제목3(카드3): 본문 중에 나타난 인용구 또는 상황을 사용하여 상황의 심각성을 전달하고 공감을 이끌어내는 제목. reason: "인용구/상황 묘사 + 공감 유도"
-     * 제목4(카드4): 내면적/외형적 변화를 언급하여 독자들이 자신의 상태를 즉각 확인하게 만드는 제목. reason: "내면·외형 변화 언급 + 자가 점검 유도"
-     * 제목5(카드5): 타겟 독자를 명확히 하고 관련 정보에 대한 유익성을 강조하는 제목. reason: "타겟 독자 명확화 + 유익성 강조"
+   - 반드시 아래 5가지 카드 공식에 맞게 각각 하나씩 한국어로 생성하세요:
+     * 제목1: [충격 클릭 유도형] 본문에서 가장 충격적인 사실을 뽑아 클릭 욕구를 자극하고 원인에 대한 궁금증을 유발. reason 필드 값: "충격적 사실 + 원인 궁금증 유발"
+     * 제목2: [썸네일 키워드 결합형] 이미지/썸네일에 보이는 핵심 키워드들을 조합하여 호기심 자극. reason 필드 값: "썸네일 키워드 결합 + 호기심 자극"
+     * 제목3: [인용/상황 공감형] 본문 속 인상적인 인용구나 상황을 활용하여 심각성과 공감을 유도. reason 필드 값: "인용구/상황 묘사 + 공감 유도"
+     * 제목4: [변화 자가점검형] 내면적 또는 외형적 변화를 언급하여 독자가 즉시 자신의 상태를 확인하게 만듦. reason 필드 값: "내면·외형 변화 언급 + 자가 점검 유도"
+     * 제목5: [타겟 유익성 강조형] 대상 독자를 명시하고 정보의 유익성을 강조하여 공유 욕구 자극. reason 필드 값: "타겟 독자 명확화 + 유익성 강조"
+   - ⚠️ 주의: 제목에 URL, http, www, 링크, 해시태그를 절대 포함하지 말 것. 모든 제목은 한국어여야 함.
 3. 1번 표지 배경용 영문 이미지 생성 프롬프트(coverImagePrompt):
    - 원본 사진에 글씨나 자막, 워터마크가 있더라도, 새로 제작되는 표지 배경 사진에는 글자가 일절 없는 깨끗한 실제 사진(textless clean photograph, no words, no subtitles)이어야 합니다.
    - 핵심 피사체(인물, 행동, 사물)를 글자 없이 깨끗한 실제 사진으로 그릴 수 있는 30~50단어의 구체적인 영문 프롬프트 작성.
