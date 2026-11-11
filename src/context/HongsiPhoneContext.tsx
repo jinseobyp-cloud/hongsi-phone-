@@ -20,7 +20,7 @@ import {
   generateBlankCards,
 } from '../services/mockAiService';
 import { exportCardsAsZip } from '../utils/exportZip';
-import { analyzeContentWithAI, generateCardImageAI, formatFallbackTitle, removeTextFromImageWithAI, extractContentFromUrl, generateCleanSubjectPhotoAI, generate5FormulaTitles } from '../services/geminiService';
+import { analyzeContentWithAI, generateCardImageAI, formatFallbackTitle, removeTextFromImageWithAI, extractContentFromUrl, generateCleanSubjectPhotoAI, generate5FormulaTitles, generateQualitySummaryAndCaption } from '../services/geminiService';
 import {
   fetchServerAuthInfo,
   verifyPasswordMatch,
@@ -61,6 +61,7 @@ interface HongsiPhoneContextType {
   removeReferenceImage: () => void;
   setCanvasZoom: (zoom: number | ((prev: number) => number)) => void;
   runSourceAnalysis: () => Promise<void>;
+  setArticleSummary: (summary: string) => void;
   selectRecommendedTitle: (id: string) => void;
   runGenerateImage: (cardIndex?: number) => Promise<void>;
   runGenerateAllImages: () => Promise<void>;
@@ -530,6 +531,8 @@ export const HongsiPhoneProvider: React.FC<{ children: React.ReactNode }> = ({ c
         },
       }));
 
+      const { summary: qualitySummary, caption: qualityCaption } = generateQualitySummaryAndCaption(raw);
+
       setState((prev) => ({
         ...prev,
         apiKey: activeApiKey || prev.apiKey,
@@ -538,14 +541,25 @@ export const HongsiPhoneProvider: React.FC<{ children: React.ReactNode }> = ({ c
         activeCardIndex: 0,
         activeMainTab: 'card',
         aiRecommendedTitles: formulaTitles,
-        articleSummary: raw.slice(0, 150) || '원문 내용을 바탕으로 기획된 카드뉴스입니다.',
+        articleSummary: qualitySummary,
         exportAndTranslate: {
           ...prev.exportAndTranslate,
-          captionText: `${raw.slice(0, 120)}\n\n#카드뉴스 #홍시폰 #정보공유`,
+          captionText: qualityCaption,
         },
         isSaved: false,
       }));
     }
+  };
+
+  const setArticleSummary = (summary: string) => {
+    setState((prev) => ({
+      ...prev,
+      articleSummary: summary,
+      exportAndTranslate: {
+        ...prev.exportAndTranslate,
+        captionText: summary,
+      },
+    }));
   };
 
   const selectRecommendedTitle = (id: string) => {
@@ -1154,6 +1168,7 @@ export const HongsiPhoneProvider: React.FC<{ children: React.ReactNode }> = ({ c
         removeReferenceImage,
         setCanvasZoom,
         runSourceAnalysis,
+        setArticleSummary,
         selectRecommendedTitle,
         runGenerateImage,
         runGenerateAllImages,

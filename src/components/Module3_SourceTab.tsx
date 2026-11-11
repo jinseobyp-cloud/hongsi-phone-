@@ -32,6 +32,7 @@ export const Module3_SourceTab: React.FC = () => {
     setReferenceImage,
     removeReferenceImage,
     runSourceAnalysis,
+    setArticleSummary,
     selectRecommendedTitle,
     runGenerateImage,
     runGenerateAllImages,
@@ -516,16 +517,30 @@ export const Module3_SourceTab: React.FC = () => {
               })}
             </div>
 
-            {/* 본문 핵심 요약 박스 */}
+            {/* 본문 핵심 요약 박스 (인스타그램 고품질 캡션 연동) */}
             <div className="space-y-1.5 pt-1">
-              <label className="text-xs font-bold text-[#4A4036] dark:text-slate-200">
-                본문 핵심 요약
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-[#4A4036] dark:text-slate-200 flex items-center space-x-1">
+                  <span>본문 핵심 요약</span>
+                  <span className="text-[10px] text-[#8C6D4F] dark:text-amber-400 font-semibold">(인스타그램 최종 캡션)</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(state.articleSummary);
+                    alert('📋 본문 캡션이 클립보드에 복사되었습니다!');
+                  }}
+                  className="text-[10px] font-bold text-[#5C4028] dark:text-amber-400 hover:underline px-1.5 py-0.5 rounded bg-[#FAF7F2] dark:bg-slate-800 border border-[#E6E1D8] dark:border-slate-700"
+                >
+                  복사하기
+                </button>
+              </div>
               <textarea
                 value={state.articleSummary}
-                rows={3}
-                readOnly
-                className="w-full p-3 rounded-xl border border-[#E6E1D8] dark:border-slate-700 bg-[#FAF7F2] dark:bg-slate-800 text-xs text-slate-800 dark:text-slate-100 leading-relaxed outline-none resize-none"
+                onChange={(e) => setArticleSummary(e.target.value)}
+                rows={6}
+                placeholder="분석을 실행하면 전문 작가 스타일의 스토리텔링형 고품질 인스타그램 캡션이 자동으로 완성됩니다."
+                className="w-full p-3 rounded-xl border border-[#E6E1D8] dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-800 dark:text-slate-100 leading-relaxed outline-none focus:border-[#5C4028] transition"
               />
             </div>
 

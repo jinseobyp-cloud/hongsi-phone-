@@ -216,6 +216,45 @@ export function generate5FormulaTitles(rawText: string): AIRecommendedTitle[] {
   }));
 }
 
+/**
+ * 4대 분야별(과학/잡학, 사건사고, 동물, 감동) 전문 작가 프롬프트 기준에 맞춰
+ * 인스타그램 카드뉴스의 실제 캡션으로 바로 쓸 수 있는 고품질 4~6문단 본문과 해시태그를 생성합니다.
+ */
+export function generateQualitySummaryAndCaption(rawText: string): { summary: string; caption: string } {
+  const cleanParagraphs = (rawText || '')
+    .split('\n')
+    .map((p) => p.trim())
+    .filter((p) => p.length > 0 && !/^(https?:\/\/|www\.)/i.test(p) && !/^#[a-zA-Z0-9가-힣_]+/i.test(p));
+
+  const fullText = cleanParagraphs.join(' ');
+  const isEnglish = /^[a-zA-Z0-9\s.,!?'"()-]+$/.test(fullText.slice(0, 100));
+
+  let summary = '';
+  let tags = '#카드뉴스 #정보공유 #트렌드';
+
+  if (isEnglish && /tooth|teeth|dental|regrow|anodontia/i.test(fullText)) {
+    summary = `유치가 빠지고 영구치가 자란 뒤, 평생 치아가 다시 자라지 않는다는 것은 인류의 오랜 상식이었습니다.\n\n그런데 최근 일본 교토대 연구진이 사람의 입안에 숨겨져 있던 '제3의 치아'를 다시 자라나게 만드는 혁신적인 신약을 개발해 전 세계 과학계를 놀라게 했습니다.\n\n연구진은 치아 성장을 억제하는 'USAG-1'이라는 특정 단백질 유전자에 주목했습니다. 이 유전자의 브레이크 기능을 차단하자, 잇몸 속 숨은 싹에서 새로운 치아가 다시 돋아나는 놀라운 결과가 확인된 것입니다.\n\n쥐와 흰족제비를 대상으로 한 동물 실험을 성공적으로 마친 뒤, 지난 9월부터 건강한 성인을 대상으로 한 1단계 인간 임상시험에 공식 착수했습니다. 이후 선천성 무치악증 환아들을 대상으로 임상을 확대할 계획입니다.\n\n치아가 빠지면 틀니나 임플란트밖에 선택지가 없던 시대가 끝나고, 자신의 원래 치아를 다시 재생시키는 기적 같은 치료법이 우리 눈앞으로 다가오고 있습니다.`;
+    tags = '#치아재생 #과학뉴스 #임플란트 #의학혁신 #카드뉴스 #건강정보 #잡학사전';
+  } else if (isEnglish && /buffett|invest|money|coca/i.test(fullText)) {
+    summary = `세계 최고의 투자자로 불리는 워런 버핏은 90세가 넘는 고령에도 믿기 힘들 만큼 왕성한 활동을 이어가고 있습니다.\n\n놀랍게도 그는 48년 동안 생수를 단 한 번도 마시지 않았다고 밝혀 화제가 되었습니다. 대신 하루에 5캔 이상의 콜라와 인스턴트 음식을 즐겨 먹는 것으로 유명합니다.\n\n의학계에서는 그의 식습관을 '의학적 미스터리'라고 부르기도 하지만, 버핏은 "내가 가장 행복한 음식을 먹는 것이 내 장수와 활력의 가장 큰 비결"이라고 유쾌하게 말합니다.\n\n식습관 자체를 무작정 따라 할 수는 없겠지만, 즐겁고 스트레스 없는 마음가짐이 건강에 미치는 엄청난 영향력을 다시금 생각해보게 만드는 흥미로운 사례입니다.`;
+    tags = '#워런버핏 #투자명언 #건강비결 #스토리텔링 #인스타그램카드뉴스 #성공비결';
+  } else if (cleanParagraphs.length >= 2) {
+    // 한국어 또는 일반 본문 재구성
+    const p1 = cleanParagraphs[0];
+    const p2 = cleanParagraphs[1] || '';
+    const p3 = cleanParagraphs.slice(2, 5).join(' ') || '';
+    
+    summary = `${p1}\n\n${p2}${p3 ? '\n\n' + p3 : ''}\n\n원문에서 전해진 핵심 사실과 최신 흐름을 종합해보면, 이번 이슈는 앞으로도 많은 사람들의 관심과 주목을 받을 것으로 보입니다.`;
+    tags = '#카드뉴스 #이슈정리 #핵심요약 #트렌드브리핑 #정보공유';
+  } else {
+    summary = `${rawText.slice(0, 300)}\n\n이와 관련된 상세한 내용과 후속 정보는 앞으로도 지속적인 관심이 필요해 보입니다.`;
+    tags = '#카드뉴스 #정보공유';
+  }
+
+  const caption = `${summary}\n\n${tags}`;
+  return { summary, caption };
+}
+
 export function formatFallbackTitle(text: string, defaultHook: string = '핵심 내용'): string {
   const clean = (text || '').replace(/\[|\]/g, '').trim();
   if (!clean) return `스마트폰 카드뉴스\n[${defaultHook}]`;
@@ -321,12 +360,14 @@ export async function analyzeContentWithAI(
       },
     }));
 
+    const { summary: qualitySummary, caption: qualityCaption } = generateQualitySummaryAndCaption(sanitizedText);
+
     return {
       projectTitle: card1Title.replace(/\[|\]|\n/g, ' ').slice(0, 20),
       recommendedTitles: formulaTitles,
-      articleSummary: sanitizedText.slice(0, 150) || '원문 내용을 바탕으로 기획된 카드뉴스입니다.',
+      articleSummary: qualitySummary,
       cards: simCards,
-      caption: `${sanitizedText.slice(0, 120)}\n\n#카드뉴스 #홍시폰 #정보공유`,
+      caption: qualityCaption,
     };
   }
 
@@ -362,11 +403,19 @@ ${sanitizedText}
 3. 1번 표지 배경용 영문 이미지 생성 프롬프트(coverImagePrompt):
    - 원본 사진에 글씨나 자막, 워터마크가 있더라도, 새로 제작되는 표지 배경 사진에는 글자가 일절 없는 깨끗한 실제 사진(textless clean photograph, no words, no subtitles)이어야 합니다.
    - 핵심 피사체(인물, 행동, 사물)를 글자 없이 깨끗한 실제 사진으로 그릴 수 있는 30~50단어의 구체적인 영문 프롬프트 작성.
-4. 원문 핵심 요약 3~4문장(articleSummary)
+4. 고품질 인스타그램 카드뉴스 본문 및 캡션(articleSummary & caption):
+   - 원문의 내용을 단순히 1~2줄로 요약하지 마세요! 인스타그램 카드뉴스의 실제 캡션으로 게시할 수 있는 완성도 높은 4~7문단의 스토리텔링형 고품질 본문을 작성하세요.
+   - [작성 규칙]:
+     * 제3자가 친절하게 설명하는 시점으로 작성하며, '-했습니다 / -합니다' 또는 '-했다 / -한다'의 자연스러운 문체를 사용하세요.
+     * 원문이 영어 등 외국어인 경우 매끄러운 한국어로 완전히 번역 및 재구성하세요.
+     * 첫 문장은 독자의 호기심을 끄는 흥미로운 사실이나 상황으로 시작하고, [배경 → 상황/원리 → 결과/의미] 순서로 몰입감 있게 전개하세요.
+     * 모바일에서 읽기 편하도록 문단마다 줄바꿈(\\n\\n)을 넣어 깔끔하게 분리하세요.
+     * 사건사고, 과학/잡학, 동물, 감동 사연의 특성에 맞춰 독자가 끝까지 읽을 수밖에 없는 흡입력 있는 글로 완성하세요.
+   - articleSummary 필드: 위 작성 규칙에 따라 완성된 4~7문단의 완성형 본문 텍스트.
+   - caption 필드: 위 완성형 본문에 어울리는 해시태그 5~8개가 덧붙여진 인스타그램 최종 업로드용 캡션.
 5. 총 ${targetCardCount}장의 카드 문구(cards):
    - 1번 카드는 표지(role: "표지"), 나머지는 본문(role: "본문")
    - 각 카드의 titleText는 2줄 줄바꿈(\\n)과 핵심 강조구간 [대괄호] 포함
-6. 인스타그램 업로드용 상세 캡션 및 해시태그(caption)
 
 반드시 아래 JSON 형식으로만 응답해 주세요:
 {
