@@ -20,7 +20,7 @@ import {
   generateBlankCards,
 } from '../services/mockAiService';
 import { exportCardsAsZip } from '../utils/exportZip';
-import { analyzeContentWithAI, generateCardImageAI, formatFallbackTitle, removeTextFromImageWithAI, extractContentFromUrl, generateCleanSubjectPhotoAI, generate5FormulaTitles, generateQualitySummaryAndCaption } from '../services/geminiService';
+import { analyzeContentWithAI, generateCardImageAI, formatFallbackTitle, removeTextFromImageWithAI, extractContentFromUrl, generateCleanSubjectPhotoAI, generate5FormulaTitles, generateQualitySummaryAndCaption, translateFullContentAI } from '../services/geminiService';
 import {
   fetchServerAuthInfo,
   verifyPasswordMatch,
@@ -84,7 +84,7 @@ interface HongsiPhoneContextType {
   openColorPicker: (target: 'base' | 'accent') => void;
   closeColorPicker: () => void;
   setColorPickerColor: (hex: string) => void;
-  translateLanguage: (lang: string) => void;
+  translateLanguage: (lang: string) => Promise<void>;
   generateCaption: () => void;
   exportZip: () => Promise<void>;
   loadSampleProject: () => void;
@@ -1037,39 +1037,37 @@ export const HongsiPhoneProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
   };
 
-  const translateLanguage = (lang: string) => {
-    setState((prev) => {
-      const isJapanese = lang === '日本語';
-      const updatedCards = prev.cards.map((c, idx) => {
-        if (idx === 0) {
-          return {
-            ...c,
-            titleText: isJapanese
-              ? '登録者220万の配信者\n[放送中断に追い込んだ病気]'
-              : '2.2M Streamer\n[The Disease That Stopped Broadcasts]',
-          };
-        }
-        return {
+  const translateLanguage = async (lang: string) => {
+    const activeApiKey =
+      state.apiKey ||
+      (typeof window !== 'undefined' ? localStorage.getItem('hongsiphone_gemini_api_key') || '' : '');
+
+    const currentCaption = state.exportAndTranslate.captionText || state.articleSummary || '';
+    const currentTitles = state.cards.map((c) => c.titleText);
+
+    try {
+      const res = await translateFullContentAI(activeApiKey, lang, currentCaption, currentTitles);
+
+      setState((prev) => {
+        const updatedCards = prev.cards.map((c, idx) => ({
           ...c,
-          titleText: isJapanese
-            ? '一日中座りっぱなしなら\n[お尻の筋肉が眠る]'
-            : 'Sitting All Day?\n[Your Glutes Are Falling Asleep]',
+          titleText: res.translatedCardTitles[idx] || c.titleText,
+        }));
+
+        return {
+          ...prev,
+          exportAndTranslate: {
+            ...prev.exportAndTranslate,
+            targetLanguage: lang,
+            captionText: res.translatedCaption,
+          },
+          cards: updatedCards,
+          isSaved: false,
         };
       });
-
-      return {
-        ...prev,
-        exportAndTranslate: {
-          ...prev.exportAndTranslate,
-          targetLanguage: lang,
-          captionText: isJapanese
-            ? '登録者220万人のゲーム実況者が突如放送休止を発表した衝撃의 理由をご存知ですか？\n\n原因は現代人の持病とも言われる「大臀筋健忘症」です。'
-            : 'Do you know why a 2.2M gaming streamer suddenly halted their streams?\n\nThe cause is the modern illness known as gluteal amnesia.',
-        },
-        cards: updatedCards,
-        isSaved: false,
-      };
-    });
+    } catch (e) {
+      console.error('Translation error:', e);
+    }
   };
 
   const generateCaption = () => {

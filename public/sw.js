@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hongsiphone-v2-cache-v23';
+const CACHE_NAME = 'hongsiphone-v2-cache-v24';
 const PRECACHE_URLS = [
   './manifest.json',
   './hongsi_icon_192.png',

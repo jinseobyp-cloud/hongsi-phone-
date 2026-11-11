@@ -72,6 +72,7 @@ export const Module3_SourceTab: React.FC = () => {
   const [selectedLang, setSelectedLang] = useState('한국어 (원문)');
   const [isCopied, setIsCopied] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isTranslating, setIsTranslating] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -103,6 +104,18 @@ export const Module3_SourceTab: React.FC = () => {
     navigator.clipboard.writeText(state.exportAndTranslate.captionText);
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 2000);
+  };
+
+  const handleTranslate = async () => {
+    try {
+      setIsTranslating(true);
+      await translateLanguage(selectedLang);
+    } catch (e) {
+      console.error('Translation failed:', e);
+      alert('번역 처리 중 오류가 발생했습니다.');
+    } finally {
+      setIsTranslating(false);
+    }
   };
 
   const handleZipDownload = async () => {
@@ -811,31 +824,46 @@ export const Module3_SourceTab: React.FC = () => {
 
               <button
                 type="button"
-                onClick={() => translateLanguage(selectedLang)}
-                className="w-full py-2.5 px-3 rounded-xl border border-[#E6E1D8] dark:border-slate-700 bg-[#EFECE6] dark:bg-slate-800 hover:bg-[#E8E4DD] text-slate-800 dark:text-slate-200 font-bold text-xs flex items-center justify-between transition"
+                disabled={isTranslating}
+                onClick={handleTranslate}
+                className={`w-full py-2.5 px-3 rounded-xl border border-[#E6E1D8] dark:border-slate-700 font-bold text-xs flex items-center justify-between transition ${
+                  isTranslating
+                    ? 'bg-amber-100 text-amber-800 animate-pulse'
+                    : 'bg-[#EFECE6] dark:bg-slate-800 hover:bg-[#E8E4DD] text-slate-800 dark:text-slate-200'
+                }`}
               >
                 <span className="flex items-center space-x-1.5">
-                  <Languages className="w-3.5 h-3.5 text-slate-600" />
-                  <span>이 언어로 번역</span>
+                  <Languages className={`w-3.5 h-3.5 text-slate-600 ${isTranslating ? 'animate-spin' : ''}`} />
+                  <span>{isTranslating ? `${selectedLang} 전문 번역 중...` : `${selectedLang}로 전문 번역`}</span>
                 </span>
                 <span className="px-2 py-0.5 rounded-full bg-white dark:bg-slate-700 text-[#5C4028] dark:text-amber-300 font-bold text-[10px]">
-                  무료
+                  {isTranslating ? 'AI 처리중' : '전문 번역'}
                 </span>
               </button>
             </div>
 
             {/* 업로드용 캡션 생성 및 편집기 */}
             <div className="space-y-1.5 pt-1 border-t border-[#F5F2EC] dark:border-slate-800">
-              <label className="text-xs font-bold text-[#4A4036] dark:text-slate-200">
-                업로드용 캡션
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-[#4A4036] dark:text-slate-200 flex items-center space-x-1">
+                  <span>업로드용 캡션</span>
+                  <span className="text-[10px] text-[#8C6D4F] dark:text-amber-400 font-semibold">(전문 번역 결과 반영)</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={handleCopyCaption}
+                  className="text-[10px] font-bold text-[#5C4028] dark:text-amber-400 hover:underline px-1.5 py-0.5 rounded bg-[#FAF7F2] dark:bg-slate-800 border border-[#E6E1D8] dark:border-slate-700"
+                >
+                  {isCopied ? '복사 완료! ✓' : '전체 복사'}
+                </button>
+              </div>
 
               <textarea
-                rows={4}
+                rows={8}
                 value={state.exportAndTranslate.captionText}
                 placeholder="인스타그램 게시물 본문에 올릴 캡션과 해시태그입니다."
                 readOnly
-                className="w-full p-3 rounded-xl border border-[#E6E1D8] dark:border-slate-700 bg-[#FAF7F2] dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-xs leading-relaxed outline-none resize-none"
+                className="w-full p-3 rounded-xl border border-[#E6E1D8] dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-xs leading-relaxed outline-none"
               />
 
               <div className="grid grid-cols-3 gap-2">
