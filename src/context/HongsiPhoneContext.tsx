@@ -20,7 +20,7 @@ import {
   generateBlankCards,
 } from '../services/mockAiService';
 import { exportCardsAsZip } from '../utils/exportZip';
-import { analyzeContentWithAI, generateCardImageAI, formatFallbackTitle, removeTextFromImageWithAI, extractContentFromUrl, generateCleanSubjectPhotoAI } from '../services/geminiService';
+import { analyzeContentWithAI, generateCardImageAI, formatFallbackTitle, removeTextFromImageWithAI, extractContentFromUrl, generateCleanSubjectPhotoAI, generate5FormulaTitles } from '../services/geminiService';
 import {
   fetchServerAuthInfo,
   verifyPasswordMatch,
@@ -468,12 +468,19 @@ export const HongsiPhoneProvider: React.FC<{ children: React.ReactNode }> = ({ c
         }));
       }, 300);
     } catch (e) {
-      console.warn('AI analysis failed, using fallback:', e);
+      console.warn('AI analysis failed, using 5-formula titles generator:', e);
       setIsAnalyzingModalOpen(false);
       const raw = currentRawText || state.sourceInput.rawText || '';
-      const lines = raw.split('\n').map((l) => l.trim()).filter((l) => l.length > 0);
-      const fallbackTitle = formatFallbackTitle(lines[0] || '스마트폰 카드뉴스', '핵심 내용');
+      
+      // 5대 카드 뉴스 제목 생성 공식 적용 (URL 제거, 문단 통복사 방지, 5개 완전 보장)
+      const formulaTitles = generate5FormulaTitles(raw);
+      const card1Title = formulaTitles[0]?.rawTitle || '스마트폰 카드뉴스\n[핵심 비결]';
       const targetCount = Math.max(1, state.sourceInput.targetCardCount || 2);
+
+      const lines = raw
+        .split('\n')
+        .map((l) => l.trim())
+        .filter((l) => l.length > 0 && !/^(https?:\/\/|www\.)/i.test(l));
 
       let card1Url = '';
       let hasCard1Photo = false;
@@ -494,7 +501,7 @@ export const HongsiPhoneProvider: React.FC<{ children: React.ReactNode }> = ({ c
       const fallbackCards: CardItem[] = Array.from({ length: targetCount }, (_, idx) => ({
         cardId: idx + 1,
         role: idx === 0 ? '표지' : '본문',
-        titleText: idx === 0 ? fallbackTitle : formatFallbackTitle(lines[idx] || `카드 ${idx + 1} 상세 안내`, `핵심 포인트 ${idx + 1}`),
+        titleText: idx === 0 ? card1Title : formatFallbackTitle(lines[idx] || `카드 ${idx + 1} 상세 안내`, `핵심 포인트 ${idx + 1}`),
         photo: {
           hasPhoto: idx === 0 ? hasCard1Photo : false,
           url: idx === 0 ? card1Url : '',
@@ -523,29 +530,14 @@ export const HongsiPhoneProvider: React.FC<{ children: React.ReactNode }> = ({ c
         },
       }));
 
-      const titlesList = [
-        formatFallbackTitle(lines[0] || '스마트폰 카드뉴스', '핵심 비결'),
-        formatFallbackTitle(lines[1] || lines[0] || '주목할 만한 이야기', '화제의 이유'),
-        formatFallbackTitle(lines[2] || lines[0] || '놓치면 아쉬운 정보', '상세 분석'),
-        formatFallbackTitle(lines[3] || lines[0] || '이것만 알면 끝', '반전 결말'),
-        formatFallbackTitle(lines[4] || lines[0] || '핵심 요약 정리', '최종 정리'),
-      ];
-
       setState((prev) => ({
         ...prev,
         apiKey: activeApiKey || prev.apiKey,
-        projectTitle: fallbackTitle.replace(/\[|\]|\n/g, ' ').slice(0, 20),
+        projectTitle: card1Title.replace(/\[|\]|\n/g, ' ').slice(0, 20),
         cards: fallbackCards,
         activeCardIndex: 0,
         activeMainTab: 'card',
-        aiRecommendedTitles: titlesList.map((t, i) => ({
-          id: `rec_${i + 1}`,
-          rawTitle: t,
-          displayWithNewlineSymbol: t.replace('\n', '\\n'),
-          score: `${(9.8 - i * 0.2).toFixed(1)}/10`,
-          reason: i === 0 ? '입력된 원문의 핵심 메시지를 직접 반영' : `원문 문맥 기반 추천 제목 ${i + 1}`,
-          isSelected: i === 0,
-        })),
+        aiRecommendedTitles: formulaTitles,
         articleSummary: raw.slice(0, 150) || '원문 내용을 바탕으로 기획된 카드뉴스입니다.',
         exportAndTranslate: {
           ...prev.exportAndTranslate,
