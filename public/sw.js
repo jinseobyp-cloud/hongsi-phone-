@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hongsiphone-v2-cache-v20';
+const CACHE_NAME = 'hongsiphone-v2-cache-v21';
 const PRECACHE_URLS = [
   './manifest.json',
   './hongsi_icon_192.png',
@@ -54,17 +54,6 @@ self.addEventListener('fetch', (event) => {
   if (event.request.mode === 'navigate' || event.request.destination === 'document') {
     event.respondWith(
       fetch(event.request, { cache: 'no-store' })
-        .then((response) => {
-          if (response && response.status === 200) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-          }
-          return response;
-        })
-        .catch(() => caches.match('./index.html') || caches.match('./'))
-    );
-    return;
-  }
         .then((response) => {
           if (response && response.status === 200) {
             const clone = response.clone();
