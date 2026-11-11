@@ -226,6 +226,12 @@ ${rawText}
 2. 가장 바이럴 가능성이 높은 AI 추천 제목 5개:
    - 각 제목은 2줄로 줄바꿈(\\n)을 포함해야 하며, 가장 핵심이 되는 강조 단어/구절은 반드시 [대괄호]로 감싸야 합니다. 예: "220만 유튜버 우주하마\\n[방송 중단하게 만든 질병]"
    - 10점 만점 바이럴 점수(score, 예: "9.5/10")와 선정 이유(reason) 포함
+   - 아래 카드별 공식을 반드시 따르세요:
+     * 제목1(카드1): 본문에서 충격적인 내용을 통해 클릭을 유도하고, 그 원인에 대한 궁금증을 자극하는 제목. reason: "충격적 사실 + 원인 궁금증 유발"
+     * 제목2(카드2): 원본 썸네일에 등장한 키워드들을 결합하여 호기심을 유발하는 제목. reason: "썸네일 키워드 결합 + 호기심 자극"
+     * 제목3(카드3): 본문 중에 나타난 인용구 또는 상황을 사용하여 상황의 심각성을 전달하고 공감을 이끌어내는 제목. reason: "인용구/상황 묘사 + 공감 유도"
+     * 제목4(카드4): 내면적/외형적 변화를 언급하여 독자들이 자신의 상태를 즉각 확인하게 만드는 제목. reason: "내면·외형 변화 언급 + 자가 점검 유도"
+     * 제목5(카드5): 타겟 독자를 명확히 하고 관련 정보에 대한 유익성을 강조하는 제목. reason: "타겟 독자 명확화 + 유익성 강조"
 3. 1번 표지 배경용 영문 이미지 생성 프롬프트(coverImagePrompt):
    - 원본 사진에 글씨나 자막, 워터마크가 있더라도, 새로 제작되는 표지 배경 사진에는 글자가 일절 없는 깨끗한 실제 사진(textless clean photograph, no words, no subtitles)이어야 합니다.
    - 핵심 피사체(인물, 행동, 사물)를 글자 없이 깨끗한 실제 사진으로 그릴 수 있는 30~50단어의 구체적인 영문 프롬프트 작성.
@@ -401,10 +407,10 @@ export async function removeTextFromImageWithAI(
   const mimeType = match[1];
   const data = match[2];
 
+  // Only use image-generation capable models; non-image-gen models return text descriptions
   const candidateModels = [
-    'gemini-2.0-flash-exp',
     'gemini-2.0-flash-preview-image-generation',
-    'gemini-2.0-flash',
+    'gemini-2.0-flash-exp',
   ];
 
   for (const model of candidateModels) {
@@ -419,7 +425,7 @@ export async function removeTextFromImageWithAI(
               {
                 parts: [
                   {
-                    text: 'Please remove all text, subtitles, watermarks, captions, and words from this image completely. Perfectly reconstruct the background and subject behind the text in high resolution.',
+                    text: 'This is a photo editing task. Do NOT generate a new image or a new person. Use ONLY the exact original image provided. Remove all text overlays, subtitles, watermarks, and captions from this image while preserving every original pixel of the person, background, and objects. Output the same image with text removed and background inpainted. Do not change the subject, face, or composition in any way.',
                   },
                   {
                     inline_data: {
@@ -431,7 +437,7 @@ export async function removeTextFromImageWithAI(
               },
             ],
             generationConfig: {
-              responseModalities: ['TEXT', 'IMAGE'],
+              responseModalities: ['IMAGE'],
             },
           }),
         }
@@ -448,13 +454,18 @@ export async function removeTextFromImageWithAI(
             return `data:${part.inline_data.mime_type || 'image/jpeg'};base64,${part.inline_data.data}`;
           }
         }
+        // Response OK but no image part → model returned text instead → skip
+        console.warn(`Model ${model} returned no image part, skipping.`);
+      } else {
+        const errData = await response.json().catch(() => ({}));
+        console.warn(`Model ${model} error:`, errData?.error?.message || response.status);
       }
     } catch (e) {
       console.warn(`Model ${model} inpainting error:`, e);
     }
   }
 
-  throw new Error('AI 글씨 제거를 처리할 수 없습니다. 제미나이 웹에서 생성된 깨끗한 사진을 업로드해 보세요.');
+  throw new Error('AI 글씨 제거 기능은 Gemini 이미지 생성 API가 필요합니다. API 키를 확인하거나 제미나이 웹(gemini.google.com)에서 직접 글씨를 지운 사진을 업로드해 주세요.');
 }
 
 /**
