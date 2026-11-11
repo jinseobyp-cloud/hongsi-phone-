@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { DEFAULT_SOURCE_TEXT } from '../services/mockAiService';
+import { SUPPORTED_LANGUAGES } from '../services/geminiService';
 
 export const Module3_SourceTab: React.FC = () => {
   const {
@@ -809,11 +810,11 @@ export const Module3_SourceTab: React.FC = () => {
                   onChange={(e) => setSelectedLang(e.target.value)}
                   className="w-full h-10 px-3.5 rounded-xl border border-[#E6E1D8] dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-bold text-slate-800 dark:text-slate-100 appearance-none outline-none"
                 >
-                  <option value="한국어 (원문)">한국어 (원문)</option>
-                  <option value="日本語">日本語 (일본어)</option>
-                  <option value="English">English (영어)</option>
-                  <option value="繁體中文">繁體中文 (중국어 번체)</option>
-                  <option value="Español">Español (스페인어)</option>
+                  {SUPPORTED_LANGUAGES.map((lang) => (
+                    <option key={lang.code} value={lang.name}>
+                      {lang.label}
+                    </option>
+                  ))}
                 </select>
                 <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3.5 top-3 pointer-events-none" />
               </div>
