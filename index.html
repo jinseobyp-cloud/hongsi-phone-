@@ -38,7 +38,7 @@
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', function() {
-          navigator.serviceWorker.register('./sw.js?v=20261111_1435').then(function(reg) {
+          navigator.serviceWorker.register('./sw.js?v=20261114_1445').then(function(reg) {
             reg.update();
             navigator.serviceWorker.addEventListener('controllerchange', function() {
               window.location.reload();

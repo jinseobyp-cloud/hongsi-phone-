@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { DEFAULT_SOURCE_TEXT } from '../services/mockAiService';
-import { SUPPORTED_LANGUAGES } from '../services/geminiService';
+import { SUPPORTED_LANGUAGES, CaptionToneOption } from '../services/geminiService';
 
 export const Module3_SourceTab: React.FC = () => {
   const {
@@ -40,6 +40,7 @@ export const Module3_SourceTab: React.FC = () => {
     updateCardPhoto,
     translateLanguage,
     generateCaption,
+    rewriteViralCaption,
     exportZip,
     loadSampleProject,
     clearAllContent,
@@ -71,9 +72,11 @@ export const Module3_SourceTab: React.FC = () => {
 
   // Accordion 4: Translation & Export state
   const [selectedLang, setSelectedLang] = useState('한국어 (원문)');
+  const [selectedTone, setSelectedTone] = useState<CaptionToneOption>('트렌디/위트형');
   const [isCopied, setIsCopied] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isTranslating, setIsTranslating] = useState(false);
+  const [isRewriting, setIsRewriting] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -116,6 +119,18 @@ export const Module3_SourceTab: React.FC = () => {
       alert('번역 처리 중 오류가 발생했습니다.');
     } finally {
       setIsTranslating(false);
+    }
+  };
+
+  const handleRewriteViral = async () => {
+    try {
+      setIsRewriting(true);
+      await rewriteViralCaption(selectedTone);
+    } catch (e) {
+      console.error('Viral rewrite failed:', e);
+      alert('바이럴 캡션 리라이팅 중 오류가 발생했습니다.');
+    } finally {
+      setIsRewriting(false);
     }
   };
 
@@ -867,33 +882,60 @@ export const Module3_SourceTab: React.FC = () => {
                 className="w-full p-3 rounded-xl border border-[#E6E1D8] dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-xs leading-relaxed outline-none"
               />
 
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  onClick={generateCaption}
-                  className="col-span-2 py-2 px-3 rounded-xl border border-[#E6E1D8] dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 text-slate-800 dark:text-slate-200 font-bold text-xs flex items-center justify-center space-x-1 transition"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                  <span>캡션 만들기 (무료)</span>
-                </button>
+              {/* 바이럴 캡션 리라이터 톤 선택 및 실행 컨트롤러 */}
+              <div className="space-y-2 pt-1">
+                <div className="flex items-center space-x-2">
+                  <span className="text-[11px] font-bold text-[#7A7167] dark:text-slate-400 shrink-0">
+                    바이럴 톤 선택:
+                  </span>
+                  <div className="relative flex-1">
+                    <select
+                      value={selectedTone}
+                      onChange={(e) => setSelectedTone(e.target.value as CaptionToneOption)}
+                      className="w-full h-8 px-2.5 rounded-lg border border-[#E6E1D8] dark:border-slate-700 bg-white dark:bg-slate-800 text-[11px] font-bold text-slate-800 dark:text-slate-100 appearance-none outline-none pr-6"
+                    >
+                      <option value="트렌디/위트형">🔥 트렌디/위트형 (숏폼 감성 & 재치)</option>
+                      <option value="감성/공감형">✨ 감성/공감형 (따뜻하고 여운 있는 스타일)</option>
+                      <option value="인사이트/정보형">💡 인사이트/정보형 (체계적인 지식 & 팩트)</option>
+                      <option value="동기부여/열정형">🚀 동기부여/열정형 (한계돌파 & 열정 자극)</option>
+                    </select>
+                    <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2 top-2.5 pointer-events-none" />
+                  </div>
+                </div>
 
-                <button
-                  type="button"
-                  onClick={handleCopyCaption}
-                  className="col-span-1 py-2 px-3 rounded-xl border border-[#E6E1D8] dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 text-slate-800 dark:text-slate-200 font-bold text-xs flex items-center justify-center space-x-1 transition"
-                >
-                  {isCopied ? (
-                    <>
-                      <Check className="w-3.5 h-3.5 text-emerald-600" />
-                      <span className="text-emerald-600 font-bold">복사됨!</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3.5 h-3.5 text-slate-500" />
-                      <span>복사</span>
-                    </>
-                  )}
-                </button>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    disabled={isRewriting}
+                    onClick={handleRewriteViral}
+                    className={`col-span-2 py-2.5 px-3 rounded-xl border border-[#E6E1D8] dark:border-slate-700 font-extrabold text-xs flex items-center justify-center space-x-1.5 transition ${
+                      isRewriting
+                        ? 'bg-amber-100 text-amber-800 animate-pulse'
+                        : 'bg-[#5C4028] hover:bg-[#4D3521] text-white shadow-xs'
+                    }`}
+                  >
+                    <Sparkles className={`w-3.5 h-3.5 ${isRewriting ? 'animate-spin text-amber-600' : 'text-amber-300'}`} />
+                    <span>{isRewriting ? '바이럴 캡션 리라이팅 중...' : '바이럴 캡션 리라이팅 (무료)'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleCopyCaption}
+                    className="col-span-1 py-2.5 px-3 rounded-xl border border-[#E6E1D8] dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 text-slate-800 dark:text-slate-200 font-bold text-xs flex items-center justify-center space-x-1 transition"
+                  >
+                    {isCopied ? (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-emerald-600" />
+                        <span className="text-emerald-600 font-bold">복사됨!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5 text-slate-500" />
+                        <span>복사</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
 

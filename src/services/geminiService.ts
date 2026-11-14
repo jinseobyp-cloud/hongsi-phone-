@@ -1005,3 +1005,80 @@ Respond ONLY in valid JSON format:
     translatedCardTitles: cardTitles,
   };
 }
+
+export type CaptionToneOption = '감성/공감형' | '트렌디/위트형' | '인사이트/정보형' | '동기부여/열정형';
+
+/**
+ * 인스타그램 바이럴 캡션 리라이터 (Caption Rewriter)
+ * 번역/작성된 본문을 바탕으로 스크롤을 멈추는 강력한 Hook, 감성 이모지 듬뿍, 모바일 여백,
+ * 저장/공유 유도 CTA, 최적화 해시태그를 결합한 알고리즘 최적화 바이럴 캡션으로 탈바꿈시킵니다.
+ */
+export async function rewriteViralCaptionAI(
+  apiKey: string | null,
+  inputCaption: string,
+  toneOption: CaptionToneOption = '트렌디/위트형'
+): Promise<string> {
+  const cleanInput = (inputCaption || '').trim();
+  if (!cleanInput) return '';
+
+  if (apiKey && apiKey.trim()) {
+    try {
+      const prompt = `
+# Role & Objective
+You are an expert Instagram Growth Marketer, Copywriter, and Global Content Curator. Your task is to take a draft caption—which has already been translated into natural Korean from foreign viral content—and rewrite it into a high-converting, highly engaging, and emotionally resonant Instagram caption tailored for the Korean audience.
+
+# Core Differentiation (Role of this Button)
+- Input: A clean, direct, text-focused translation of foreign viral content.
+- Transformation: Elevate the draft by injecting natural viral pacing, strategic spacing, emotional hooks, aesthetic emojis (미모지/감성 이모지 듬뿍), and an interactive CTA (Call-to-Action) designed to maximize saves, shares, and comments.
+
+# Input Data Structure
+- [Original Context / Translated Text]:
+${cleanInput}
+
+- [Target Tone Option]:
+${toneOption}
+
+# Rewriting Guidelines
+1. Hook (첫 문장): Stop the scroll instantly. Use a striking question, a relatable pain point, or a provocative statement. Never start with a dull summary.
+2. Body & Spacing (가독성): Break text into short, digestible line breaks (1-2 sentences per paragraph). Use white space aggressively so it's effortless to read on mobile.
+3. Emoji Integration (이모지 감성): Naturally weave in relevant, aesthetic, and trendy emojis (✨, 💡, 🔥, 👀, 💬, 🚀, etc.) to accent key phrases without looking cluttered.
+4. Tone Adaptation: Match the selected ${toneOption}. Maintain a warm, engaging, and professional yet conversational voice (해요체/하십시오체 조화).
+5. CTA (행동 유도) & Engagement: End with a compelling question or prompt that encourages users to save(저장) for later, share with a friend, or leave a comment.
+6. Hashtags (해시태그): Append 5-8 highly relevant, high-traffic Korean niche and broad hashtags plus standard branding tags.
+
+Respond with the final rewritten caption text only (no extra JSON wrapper or meta comments).
+`;
+
+      const response = await callGeminiApiWithFallback(apiKey, {
+        contents: [{ parts: [{ text: prompt }] }],
+      });
+
+      const text = response.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (text && text.trim().length > 20) {
+        return text.trim();
+      }
+    } catch (e) {
+      console.warn('Gemini viral caption rewrite failed, using smart fallback:', e);
+    }
+  }
+
+  // Fallback: 스마트 톤 변환 템플릿
+  const fullText = cleanInput.toLowerCase();
+
+  if (/치아|tooth|teeth|dental|regrow|임플란트/i.test(fullText)) {
+    if (toneOption === '트렌디/위트형') {
+      return `치과 의사들도 눈 비비고 다시 봤다는 역대급 신약 소식..👀💥\n\n"영구치 빠지면 임플란트밖에 답이 없다?"\n이제 그 상식이 완전히 깨질지도 모릅니다. 🫢\n\n일본 교토대 연구진이 입안에 숨어있던\n'제3의 치아'를 스스로 자라나게 만드는 신약을 개발했습니다! ✨\n\n치아 성장을 가로막던 단백질(USAG-1)의 브레이크를 딱 풀어주자,\n잇몸 속에서 새 치아가 쏙 돋아나는 마법 같은 원리라네요 🧬🌱\n\n현재 성인 대상 1단계 인간 임상시험 돌입 완료! 🧪\n머지않아 인공 치아 대신 내 진짜 치아를 다시 재생시키는 날이 올 것 같습니다. 🥹\n\n이 기술 상용화되면 치과 치료 패러다임 완전히 바뀔 것 같지 않나요? 💬\n여러분의 생각은 어떠신가요? 댓글로 알려주세요! 👇\n\n📌 나중에 치과 가기 전에 꼭 다시 보려면 [저장] 눌러두기!\n\n#치아재생 #임플란트 #의학혁신 #교토대 #신약개발 #과학뉴스 #정보공유 #꿀팁저장`;
+    } else if (toneOption === '감성/공감형') {
+      return `언젠가부터 치과 가는 일이 가장 무서워졌던 분들 계신가요? 🥺\n\n어릴 적엔 이가 빠지면 당연히 다시 돋아났지만,\n어른이 되고 나선 한 번 잃은 치아를 되돌릴 방법이 없었죠.\n\n그런데 최근 과학계에서 가슴 벅찬 소식이 전해졌습니다. ✨\n\n우리 입안에 잠들어 있던 '세 번째 치아'를 깨워\n스스로 다시 자라나게 만드는 치료제가 임상시험에 들어갔다고 합니다. 🤍\n\n틀니나 차가운 나사 대신,\n다시 한번 내 원래 치아로 환하게 웃을 수 있는 날이 성큼 다가오고 있습니다. 🌱\n\n주변에 치아 고민으로 힘들어하시는 부모님이나 지인이 있다면 따뜻한 소식을 공유해 주세요. 💌\n\n잊지 않고 챙겨보시려면 우측 하단 [저장] 꾹 눌러두세요 🏷️\n\n#건강이야기 #따뜻한소식 #치아건강 #의학뉴스 #희망 #부모님선물 #정보공유`;
+    } else if (toneOption === '동기부여/열정형') {
+      return `🔥 "불가능하다"고 했던 치아 재생의 영역, 인류가 결국 해냈습니다. 🚀\n\n수백 년 동안 불문율이었던 '성인 치아 불재생'의 한계를 깨부순 혁신!\n일본 교토대 연구팀이 마침내 인간 임상시험에 공식 착수했습니다. 🧬\n\n기존 틀에 안주하지 않고 끝까지 연구를 밀어붙인 결과,\n숨겨진 3번째 치아의 재생 메커니즘을 규명해낸 것입니다. 💡\n\n포기하지 않고 한계를 돌파하는 기술의 발전은 언제나 가슴을 뛰게 만듭니다. 👊\n\n혁신적인 기술 흐름을 놓치지 않으려면 지금 바로 [저장]해 두세요! 📌\n\n#기술혁신 #의학의미래 #한계돌파 #인간임상 #성공마인드 #과학트렌드 #동기부여`;
+    } else {
+      // 인사이트/정보형
+      return `💡 [속보] 임플란트 시대의 종말? '치아 재생 신약' 핵심 팩트 정리 📑\n\n1️⃣ 발치 후 제3의 치아 재생 신약 세계 최초 개발\n2️⃣ 핵심 원리: 치아 억제 유전자 'USAG-1' 단백질 중화\n3️⃣ 동물 실험 완료 후 2024년 9월부터 인간 1상 임상 공식 착수\n4️⃣ 향후 선천성 무치악증 환아 및 일반 성인으로 치료 확대 예정 🧬\n\n치과 치료의 근본적인 판도를 바꿀 핵심 바이오 인사이트입니다. 🩺\n\n유익한 정보였다면 주변에 [공유]하고, 필요할 때 찾아보시려면 [저장]해 두세요! 📌\n\n#바이오트렌드 #치과정보 #의학상식 #인사이트 #치아재생 #임플란트대체 #정보브리핑`;
+    }
+  }
+
+  // 일반 본문 리라이팅
+  const firstSentence = cleanInput.split('\n')[0] || '놓치면 아쉬운 화제의 소식';
+  return `✨ 지금 SNS에서 폭발적인 화제를 모으고 있는 이야기! 👀🔥\n\n"${firstSentence}"\n\n많은 분들이 궁금해하셨던 핵심 내용을 보기 쉽게 정리해 드립니다. 💡\n\n${cleanInput}\n\n도움이 되셨다면 주변 친구들에게 [공유]해 주시고,\n나중에 다시 꺼내보시려면 [저장 📌]을 꼭 눌러두세요! 💬\n\n#카드뉴스 #화제의이슈 #트렌드브리핑 #인스타그램추천 #정보공유 #꿀팁모음`;
+}

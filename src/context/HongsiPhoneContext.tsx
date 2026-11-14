@@ -20,7 +20,7 @@ import {
   generateBlankCards,
 } from '../services/mockAiService';
 import { exportCardsAsZip } from '../utils/exportZip';
-import { analyzeContentWithAI, generateCardImageAI, formatFallbackTitle, removeTextFromImageWithAI, extractContentFromUrl, generateCleanSubjectPhotoAI, generate5FormulaTitles, generateQualitySummaryAndCaption, translateFullContentAI } from '../services/geminiService';
+import { analyzeContentWithAI, generateCardImageAI, formatFallbackTitle, removeTextFromImageWithAI, extractContentFromUrl, generateCleanSubjectPhotoAI, generate5FormulaTitles, generateQualitySummaryAndCaption, translateFullContentAI, rewriteViralCaptionAI, CaptionToneOption } from '../services/geminiService';
 import {
   fetchServerAuthInfo,
   verifyPasswordMatch,
@@ -86,6 +86,7 @@ interface HongsiPhoneContextType {
   setColorPickerColor: (hex: string) => void;
   translateLanguage: (lang: string) => Promise<void>;
   generateCaption: () => void;
+  rewriteViralCaption: (tone: CaptionToneOption) => Promise<void>;
   exportZip: () => Promise<void>;
   loadSampleProject: () => void;
   clearAllContent: () => void;
@@ -1081,6 +1082,31 @@ export const HongsiPhoneProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }));
   };
 
+  const rewriteViralCaption = async (tone: CaptionToneOption) => {
+    const activeApiKey =
+      state.apiKey ||
+      (typeof window !== 'undefined' ? localStorage.getItem('hongsiphone_gemini_api_key') || '' : '');
+
+    const currentText = state.exportAndTranslate.captionText || state.articleSummary || '';
+    if (!currentText.trim()) return;
+
+    try {
+      const viralResult = await rewriteViralCaptionAI(activeApiKey, currentText, tone);
+      if (viralResult) {
+        setState((prev) => ({
+          ...prev,
+          exportAndTranslate: {
+            ...prev.exportAndTranslate,
+            captionText: viralResult,
+          },
+          isSaved: false,
+        }));
+      }
+    } catch (e) {
+      console.error('Viral caption rewrite error:', e);
+    }
+  };
+
   const exportZip = async () => {
     await exportCardsAsZip(
       state.cards,
@@ -1191,6 +1217,7 @@ export const HongsiPhoneProvider: React.FC<{ children: React.ReactNode }> = ({ c
         setColorPickerColor,
         translateLanguage,
         generateCaption,
+        rewriteViralCaption,
         exportZip,
         loadSampleProject,
         clearAllContent,
